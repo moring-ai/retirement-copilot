@@ -1,0 +1,889 @@
+<title>Retirement Servicing Copilot — Architecture & Paths</title>
+<meta name="description" content="How the Fidelity Retirement Servicing Copilot routes a request through Path A, Path B, or clarification — with real example flows.">
+<style>
+  :root{
+    --ground:#F4F7F5; --surface:#FFFFFF; --surface-2:#EEF3F0;
+    --ink:#13241D; --muted:#586862; --faint:#8A9892;
+    --line:#D9E2DD; --line-strong:#C2CFC8;
+    --accent:#1C6B50; --accent-deep:#0F4634; --accent-soft:#E3F0EA;
+    --pathb:#345A8C; --pathb-soft:#E5ECF5;
+    --crit:#B0472A; --crit-soft:#F6E5DE;
+    --warn:#9A7A1E;
+    --clarify:#7A6F5E; --clarify-soft:#EFEBE3;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Charter,Georgia,"Times New Roman",serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --maxw:1180px; --read:760px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
+    font-size:16.5px;line-height:1.62;-webkit-font-smoothing:antialiased;}
+  a{color:var(--accent-deep);text-decoration:none}
+  a:hover{text-decoration:underline}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+
+  /* ---------- masthead ---------- */
+  header.mast{background:linear-gradient(160deg,#0F4634 0%,#15573F 55%,#1C6B50 100%);
+    color:#EAF3EE;padding:64px 28px 56px;}
+  .mast-inner{max-width:var(--maxw);margin:0 auto}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;
+    color:#9DC9B6;margin:0 0 18px}
+  h1.title{font-family:var(--serif);font-weight:600;font-size:clamp(30px,5vw,52px);line-height:1.06;
+    margin:0;letter-spacing:-.01em;text-wrap:balance;max-width:18ch}
+  .subtitle{font-family:var(--serif);font-style:italic;font-size:clamp(17px,2.4vw,21px);
+    color:#C6DECF;margin:18px 0 0;max-width:62ch}
+  .mast-meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:28px}
+  .mast-meta .tag{font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;
+    border:1px solid rgba(255,255,255,.28);border-radius:999px;padding:5px 11px;color:#D7E8DF}
+
+  /* ---------- layout ---------- */
+  .layout{max-width:var(--maxw);margin:0 auto;padding:0 28px;
+    display:grid;grid-template-columns:228px minmax(0,1fr);gap:48px;align-items:start}
+  nav.toc{position:sticky;top:24px;align-self:start;padding:34px 0 40px;font-size:13.5px}
+  nav.toc .toc-h{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--faint);margin:0 0 12px}
+  nav.toc ol{list-style:none;margin:0;padding:0;counter-reset:s}
+  nav.toc li{counter-increment:s;margin:0 0 2px}
+  nav.toc a{display:block;color:var(--muted);padding:5px 10px 5px 30px;border-radius:7px;position:relative;line-height:1.3}
+  nav.toc a::before{content:counter(s,decimal-leading-zero);position:absolute;left:8px;
+    font-family:var(--mono);font-size:10.5px;color:var(--faint);top:7px}
+  nav.toc a:hover{background:var(--surface-2);text-decoration:none;color:var(--ink)}
+  nav.toc a.active{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+  nav.toc a.active::before{color:var(--accent)}
+
+  main{padding:34px 0 80px;min-width:0}
+  section{padding:18px 0 34px;border-top:1px solid var(--line);margin-top:8px}
+  section:first-of-type{border-top:none}
+  .sec-num{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.12em}
+  h2{font-family:var(--serif);font-weight:600;font-size:clamp(23px,3vw,31px);line-height:1.12;
+    margin:6px 0 14px;letter-spacing:-.01em;text-wrap:balance}
+  h3{font-family:var(--sans);font-weight:680;font-size:17px;letter-spacing:.005em;margin:30px 0 8px}
+  p{margin:0 0 14px;max-width:68ch}
+  .lead{font-size:18.5px;color:#2A3A33;max-width:66ch}
+  strong{font-weight:660}
+  code{font-family:var(--mono);font-size:.86em;background:var(--surface-2);
+    padding:1.5px 5px;border-radius:4px;color:var(--accent-deep)}
+
+  /* ---------- callout ---------- */
+  .note{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);
+    border-radius:8px;padding:14px 18px;margin:18px 0;font-size:15px;color:#2C3C35;max-width:68ch}
+  .note .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--accent);display:block;margin-bottom:4px}
+
+  /* ---------- tables ---------- */
+  .tbl-wrap{overflow-x:auto;margin:18px 0;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+  table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:520px}
+  th,td{text-align:left;padding:11px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+  thead th{background:var(--surface-2);font-family:var(--sans);font-weight:670;font-size:12.5px;
+    letter-spacing:.04em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+  tbody tr:last-child td{border-bottom:none}
+  td code{white-space:nowrap}
+  .tnum{font-variant-numeric:tabular-nums}
+
+  /* ---------- architecture diagram ---------- */
+  .arch{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:26px;margin:22px 0;overflow-x:auto}
+  .arch-grid{display:flex;flex-direction:column;gap:14px;min-width:540px}
+  .layer{display:flex;align-items:center;gap:14px}
+  .layer .lname{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--faint);width:96px;flex:none;text-align:right}
+  .boxrow{display:flex;gap:12px;flex-wrap:wrap;flex:1}
+  .box{background:var(--surface-2);border:1px solid var(--line-strong);border-radius:9px;
+    padding:11px 15px;font-size:13.5px;line-height:1.25;flex:1;min-width:120px}
+  .box b{display:block;font-size:13.5px;font-weight:660;margin-bottom:1px}
+  .box span{color:var(--muted);font-size:12px}
+  .box.acc{background:var(--accent-soft);border-color:#BCD9CC}
+  .box.acc b{color:var(--accent-deep)}
+  .box.pb{background:var(--pathb-soft);border-color:#C3D2E6}
+  .box.pb b{color:#264a78}
+  .box.data{background:#fff;border-style:dashed}
+  .flow-down{text-align:center;color:var(--line-strong);font-size:18px;line-height:1;margin:-4px 0}
+
+  /* ---------- step rails ---------- */
+  .rail{display:flex;align-items:center;gap:7px;overflow-x:auto;padding:14px 2px 16px;margin:6px 0}
+  .step{font-family:var(--mono);font-size:12px;white-space:nowrap;border-radius:7px;
+    padding:7px 11px;border:1px solid var(--line-strong);background:var(--surface);color:#2c3c35}
+  .step.shared{background:var(--surface-2)}
+  .step.a{background:var(--accent-soft);border-color:#BCD9CC;color:var(--accent-deep);font-weight:600}
+  .step.b{background:var(--pathb-soft);border-color:#C3D2E6;color:#264a78;font-weight:600}
+  .step.crit{background:var(--crit-soft);border-color:#E6C3B7;color:var(--crit);font-weight:600}
+  .step.clar{background:var(--clarify-soft);border-color:#DED4C2;color:#5f5645;font-weight:600}
+  .arr{color:var(--faint);font-size:14px;flex:none}
+
+  /* ---------- self-contained flowchart ---------- */
+  .diagram-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:24px 22px 18px;margin:22px 0;overflow-x:auto}
+  .flowchart{min-width:580px;display:flex;flex-direction:column;align-items:center;gap:0;font-family:var(--sans)}
+  .fc-node{background:var(--surface-2);border:1px solid var(--line-strong);border-radius:9px;
+    padding:9px 14px;font-size:12.5px;line-height:1.32;text-align:center;max-width:340px}
+  .fc-node.sm{display:inline-block;padding:3px 9px;font-size:11px;border-radius:7px;max-width:none}
+  .fc-node.wide{min-width:300px}
+  .fc-node.llm{background:#EAF3FB;border-color:#1A5D8C;color:#15233B}
+  .fc-node.clar{background:#FFF4E5;border-color:#C77700;color:#6A4900}
+  .fc-node.out{background:var(--accent-deep);border-color:var(--accent-deep);color:#EAF3EE;
+    font-family:var(--mono);font-size:12px}
+  .fc-node.user{background:#fff;border-style:dashed}
+  .fc-dec{background:#fff;border:1.5px solid var(--accent);border-radius:999px;padding:8px 18px;
+    font-size:12.5px;font-weight:660;color:var(--accent-deep);text-align:center;max-width:400px}
+  .fc-arrow{color:var(--line-strong);font-size:15px;line-height:1;padding:6px 0;
+    display:flex;align-items:center;gap:8px}
+  .fc-lbl{font-family:var(--mono);font-size:10px;color:var(--muted);background:var(--surface-2);
+    border:1px solid var(--line);border-radius:5px;padding:1px 7px}
+  .fc-routes{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding:12px 0 2px}
+  .fc-route{font-family:var(--mono);font-size:10.5px;border-radius:6px;padding:4px 10px;border:1px solid}
+  .fc-route.a{background:var(--accent-soft);border-color:#BCD9CC;color:var(--accent-deep)}
+  .fc-route.b{background:var(--pathb-soft);border-color:#C3D2E6;color:#264A78}
+  .fc-paths{display:grid;grid-template-columns:1fr 1fr;gap:18px;width:100%;margin-top:8px}
+  .fc-sub{border:1px solid var(--line-strong);border-radius:12px;padding:0 0 16px;overflow:hidden;
+    display:flex;flex-direction:column;align-items:center}
+  .fc-sub.a{border-color:#BCD9CC}
+  .fc-sub.b{border-color:#C3D2E6}
+  .fc-title{width:100%;text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;
+    text-transform:uppercase;padding:9px;margin-bottom:8px;font-weight:600}
+  .fc-sub.a .fc-title{background:var(--accent-soft);color:var(--accent-deep)}
+  .fc-sub.b .fc-title{background:var(--pathb-soft);color:#264A78}
+  .fc-fork{font-family:var(--mono);font-size:10.5px;color:var(--muted);display:flex;
+    align-items:center;gap:6px;flex-wrap:wrap;justify-content:center;padding:3px 10px}
+  .fc-merge{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;padding:12px 0 2px}
+  .cap{font-size:12.5px;color:var(--muted);text-align:center;margin-top:16px;font-style:italic;max-width:none}
+
+  /* ---------- flow cards ---------- */
+  .flow{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    margin:22px 0;overflow:hidden}
+  .flow-head{padding:16px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    border-bottom:1px solid var(--line)}
+  .flow-head .fno{font-family:var(--serif);font-size:26px;font-weight:600;line-height:1}
+  .flow-head h3{margin:0;font-size:16.5px}
+  .badge{font-family:var(--mono);font-size:11px;letter-spacing:.05em;padding:4px 10px;border-radius:999px;
+    font-weight:600;white-space:nowrap}
+  .badge.a{background:var(--accent-soft);color:var(--accent-deep)}
+  .badge.b{background:var(--pathb-soft);color:#264a78}
+  .badge.crit{background:var(--crit-soft);color:var(--crit)}
+  .badge.clar{background:var(--clarify-soft);color:#5f5645}
+  .flow-body{padding:8px 22px 22px}
+  .prompt{font-family:var(--serif);font-style:italic;font-size:17px;color:#22322b;
+    border-left:3px solid var(--line-strong);padding:6px 0 6px 16px;margin:16px 0 4px}
+  .mini-h{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--faint);margin:20px 0 6px}
+  ul.clean{margin:6px 0 6px;padding-left:20px}
+  ul.clean li{margin:4px 0;max-width:64ch}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;font-size:14.5px;margin:10px 0}
+  .kv dt{font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+  .kv dd{margin:0}
+  .pill{font-family:var(--mono);font-size:11.5px;padding:2px 8px;border-radius:5px;font-weight:600}
+  .pill.no{background:var(--accent-soft);color:var(--accent-deep)}
+  .pill.yes{background:var(--crit-soft);color:var(--crit)}
+  .pill.neutral{background:var(--surface-2);color:var(--muted)}
+
+  /* ---------- code/json ---------- */
+  pre{background:#0F2019;color:#D6E6DD;border-radius:10px;padding:18px 20px;overflow-x:auto;
+    font-family:var(--mono);font-size:13px;line-height:1.55;margin:14px 0}
+  pre .k{color:#86C9A8}
+  pre .s{color:#D6C18A}
+  pre .c{color:#6E8579;font-style:italic}
+  pre .b{color:#E59A77}
+
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width:680px){.two-col{grid-template-columns:1fr}.fc-paths{grid-template-columns:1fr}}
+
+  footer{max-width:var(--maxw);margin:0 auto;padding:30px 28px 60px;color:var(--faint);
+    font-size:13px;border-top:1px solid var(--line)}
+
+  @media (max-width:900px){
+    .layout{grid-template-columns:1fr;gap:0}
+    nav.toc{position:static;padding:22px 0 8px;border-bottom:1px solid var(--line)}
+    nav.toc ol{columns:2;column-gap:18px}
+  }
+</style>
+
+<header class="mast">
+  <div class="mast-inner">
+    <p class="eyebrow">Internal Reference · Augmented-LLM + Prompt-Chain Demo</p>
+    <h1 class="title">Retirement Servicing Copilot</h1>
+    <p class="subtitle">How one associate request is routed — through Path A, Path B, or a clarification — and what each path actually does, end to end.</p>
+    <div class="mast-meta">
+      <span class="tag">FastAPI · LangGraph</span>
+      <span class="tag">pgvector RAG</span>
+      <span class="tag">MCP tools</span>
+      <span class="tag">OpenAI + offline fallback</span>
+      <span class="tag">Associate-facing · human-in-the-loop</span>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="toc" aria-label="Contents">
+    <p class="toc-h">Contents</p>
+    <ol>
+      <li><a href="#overview">What this is</a></li>
+      <li><a href="#flow">The flow at a glance</a></li>
+      <li><a href="#cast">The three roles</a></li>
+      <li><a href="#architecture">Architecture</a></li>
+      <li><a href="#ragmcp">RAG vs MCP</a></li>
+      <li><a href="#mcp">MCP tools &amp; data</a></li>
+      <li><a href="#router">The router</a></li>
+      <li><a href="#graph">The graph</a></li>
+      <li><a href="#flows">The four flows</a></li>
+      <li><a href="#guardrails">Guardrails &amp; escalation</a></li>
+      <li><a href="#api">API contract</a></li>
+      <li><a href="#data">Mock customers</a></li>
+      <li><a href="#run">Run it locally</a></li>
+      <li><a href="#status">Built vs future</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <section id="overview">
+      <span class="sec-num">01</span>
+      <h2>What this is</h2>
+      <p class="lead">An internal copilot that helps a Fidelity <strong>associate</strong> answer a customer's retirement-rollover question in a way that is grounded, compliant, and reviewable — never an autonomous agent talking to the customer.</p>
+      <p>The associate sends one free-text request. A deterministic <strong>router</strong> reads it and picks one of two engines; both finish at the same guardrails and the same response shape. The copilot drafts an <strong>associate-ready</strong> answer — case summary, findings, next steps, required forms, a customer-facing draft, compliance notes, and escalation flags — that the associate reviews before acting. It does not give investment or tax advice, and it never moves money or executes trades.</p>
+      <div class="note">
+        <span class="lbl">The one-sentence model</span>
+        One request → <strong>router</strong> → <strong>Path A</strong> (live customer data + reasoning) <em>or</em> <strong>Path B</strong> (standard explanation from approved guidance) → <strong>guardrails</strong> → associate-ready JSON.
+      </div>
+    </section>
+
+    <section id="flow">
+      <span class="sec-num">02</span>
+      <h2>The flow at a glance</h2>
+      <p>One request enters at <code>POST /chat</code>, a deterministic router sends it down Path A or Path B, and both converge on the same code-only guardrails and the same response. Blue nodes are LLM steps; amber nodes are clarification off-ramps.</p>
+
+      <div class="diagram-card" role="img" aria-label="LangGraph flow: router dispatches to Path A or Path B, both converging on guardrails and a governed response.">
+        <div class="flowchart">
+          <div class="fc-node user">Associate / Internal User</div>
+          <div class="fc-arrow">↓</div>
+          <div class="fc-node">POST /chat — FastAPI</div>
+          <div class="fc-arrow">↓</div>
+          <div class="fc-node">parse — regex: customer id, name, rollover keywords</div>
+          <div class="fc-arrow">↓</div>
+          <div class="fc-dec">classify — ROUTER (deterministic)</div>
+          <div class="fc-routes">
+            <span class="fc-route a">rollover + customer-specific</span>
+            <span class="fc-route a">not a rollover (other)</span>
+            <span class="fc-route b">rollover + general</span>
+          </div>
+
+          <div class="fc-paths">
+            <!-- Path A -->
+            <div class="fc-sub a">
+              <div class="fc-title">Path A — Augmented LLM · live customer data</div>
+              <div class="fc-node">retrieve_rag — pgvector top-k</div>
+              <div class="fc-arrow">↓</div>
+              <div class="fc-dec">decide_tools — customer-specific?</div>
+              <div class="fc-fork">no identifier / other → <span class="fc-node clar sm">needs_clarification</span></div>
+              <div class="fc-arrow"><span class="fc-lbl">yes</span>↓</div>
+              <div class="fc-node">call_tools — all 6 read MCP tools (fixed list)</div>
+              <div class="fc-fork">customer not found → <span class="fc-node clar sm">needs_clarification</span></div>
+              <div class="fc-arrow"><span class="fc-lbl">found</span>↓</div>
+              <div class="fc-node llm">synthesize (LLM) — rollover plan</div>
+            </div>
+
+            <!-- Path B -->
+            <div class="fc-sub b">
+              <div class="fc-title">Path B — Controlled Prompt Chain · no customer data</div>
+              <div class="fc-node">retrieve_rag — pgvector top-k</div>
+              <div class="fc-arrow">↓</div>
+              <div class="fc-dec">pb_gate — RAG grounded?</div>
+              <div class="fc-fork">no chunks (fail-fast) → <span class="fc-node clar sm">needs_clarification</span></div>
+              <div class="fc-arrow"><span class="fc-lbl">grounded · pick sub-topic</span>↓</div>
+              <div class="fc-node llm">pb_explain (LLM step 1)</div>
+              <div class="fc-arrow">↓</div>
+              <div class="fc-node llm">pb_checklist (LLM step 2) — steps + forms</div>
+            </div>
+          </div>
+
+          <div class="fc-merge">Path A (synthesize) · Path B (pb_checklist) · clarifications ↓</div>
+          <div class="fc-node wide">guardrails_check — code-only safety layer</div>
+          <div class="fc-arrow">↓</div>
+          <div class="fc-node wide">format_final_response</div>
+          <div class="fc-arrow">↓</div>
+          <div class="fc-node out">ChatResponse JSON → UI</div>
+        </div>
+        <p class="cap">Actual implemented LangGraph flow: deterministic router → Path A (MCP + LLM) / Path B (prompt chain) → shared code guardrails → governed response.</p>
+      </div>
+
+      <h3>Every entity in the flow</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Entity</th><th>What it is / does</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Associate / Internal User</strong></td><td>The Fidelity servicing user who sends the request and reviews the result. The only human in the loop.</td></tr>
+            <tr><td><code>POST /chat</code> — FastAPI</td><td>The single UI-facing endpoint; validates the request and runs the graph.</td></tr>
+            <tr><td><code>parse</code></td><td>Deterministic regex extraction of a customer id (<code>CUST-####</code>), a customer name, and rollover keywords.</td></tr>
+            <tr><td><code>classify</code> (ROUTER)</td><td>Deterministic decision — sets the path from intent + whether a specific customer is named. No model call.</td></tr>
+            <tr><td><code>retrieve_rag</code></td><td>pgvector cosine top-k over the approved guidance corpus. Runs on both paths so every answer is grounded and cited.</td></tr>
+            <tr><td><code>decide_tools</code> (Path A)</td><td>Decision: is the request customer-specific? If not, off-ramp to clarification; if yes, queue the read tools.</td></tr>
+            <tr><td><code>call_tools</code> (Path A)</td><td>Calls all 6 read-only MCP tools (profile, IRA, accounts, source plan, restrictions, documents). If the customer isn't found, off-ramp to clarification.</td></tr>
+            <tr><td><code>synthesize</code> (Path A · LLM)</td><td>Turns RAG guidance + live tool data into the structured rollover plan (OpenAI, or the deterministic offline fallback).</td></tr>
+            <tr><td><code>pb_gate</code> (Path B)</td><td>Validation gate: fail-fast to clarification if no guidance was retrieved; otherwise pick a sub-topic. Demonstrates the prompt-chain gate.</td></tr>
+            <tr><td><code>pb_explain</code> (Path B · LLM)</td><td>Chain step 1 — a plain-language, cited explanation grounded in the retrieved chunks.</td></tr>
+            <tr><td><code>pb_checklist</code> (Path B · LLM)</td><td>Chain step 2 — consumes the explanation and produces the standard next-steps + required forms.</td></tr>
+            <tr><td><code>needs_clarification</code></td><td>An off-ramp shared by both paths — asks the associate for a valid identifier or notes missing grounding, instead of guessing.</td></tr>
+            <tr><td><code>guardrails_check</code></td><td>Code-only safety pass on both paths: PII redaction, advice/tax/trade checks, escalation decision, grounding check.</td></tr>
+            <tr><td><code>format_final_response</code></td><td>Assembles the API payload (incl. the chosen <code>path</code>); guardrails own the authoritative compliance + escalation fields.</td></tr>
+            <tr><td><code>ChatResponse JSON</code></td><td>The governed, associate-ready result returned to the UI.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="cast">
+      <span class="sec-num">03</span>
+      <h2>The three roles</h2>
+      <p>Keeping these straight is what makes the copilot safe: it serves the associate, not the customer.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Role</th><th>Who</th><th>Relationship to the copilot</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Associate</strong></td><td>Internal Fidelity servicing user</td><td>The <em>only</em> user of the system. Sends the request, reviews the draft, stays accountable.</td></tr>
+            <tr><td><strong>Customer</strong></td><td>The person the associate is helping (e.g. Robert Miller)</td><td>Never talks to the copilot. Receives a reply only after the associate reviews it.</td></tr>
+            <tr><td><strong>Copilot</strong></td><td>This backend</td><td>Produces an associate-ready response. No advice, no money movement, no autonomy.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="architecture">
+      <span class="sec-num">04</span>
+      <h2>Architecture</h2>
+      <p>The UI calls one FastAPI endpoint. Behind it, a LangGraph workflow orchestrates retrieval, tools, synthesis, and safety. Each layer has a single job.</p>
+      <div class="arch" role="img" aria-label="Layered architecture from UI down to data stores">
+        <div class="arch-grid">
+          <div class="layer"><span class="lname">surface</span><div class="boxrow">
+            <div class="box"><b>Associate UI</b><span>built separately · POST /chat</span></div>
+          </div></div>
+          <div class="flow-down">↓</div>
+          <div class="layer"><span class="lname">api</span><div class="boxrow">
+            <div class="box acc"><b>FastAPI backend</b><span>validation · API docs · async</span></div>
+          </div></div>
+          <div class="flow-down">↓</div>
+          <div class="layer"><span class="lname">orchestrate</span><div class="boxrow">
+            <div class="box acc"><b>LangGraph graph</b><span>router → Path A / Path B → shared tail</span></div>
+          </div></div>
+          <div class="flow-down">↓</div>
+          <div class="layer"><span class="lname">augment</span><div class="boxrow">
+            <div class="box"><b>RAG retriever</b><span>pgvector cosine · cited</span></div>
+            <div class="box"><b>MCP client</b><span>streamable-HTTP</span></div>
+            <div class="box"><b>Synthesis</b><span>OpenAI · or offline fallback</span></div>
+          </div></div>
+          <div class="flow-down">↓</div>
+          <div class="layer"><span class="lname">safety</span><div class="boxrow">
+            <div class="box acc"><b>Guardrails</b><span>PII · advice/tax/trade · escalation · grounding</span></div>
+          </div></div>
+          <div class="flow-down">↓</div>
+          <div class="layer"><span class="lname">data</span><div class="boxrow">
+            <div class="box data"><b>Postgres + pgvector</b><span>approved guidance chunks</span></div>
+            <div class="box data"><b>FastMCP server</b><span>mock customer/account tools</span></div>
+          </div></div>
+        </div>
+      </div>
+      <h3>Why each piece</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Layer</th><th>Job</th><th>Lives in</th></tr></thead>
+          <tbody>
+            <tr><td><strong>FastAPI</strong></td><td>Language-agnostic boundary for the UI; request/response validation; auto API docs at <code>/docs</code>; async I/O.</td><td><code>backend/app/main.py</code></td></tr>
+            <tr><td><strong>LangGraph</strong></td><td>Fixed, auditable control flow. The engineer owns the path; the model only fills in content.</td><td><code>backend/app/graph/</code></td></tr>
+            <tr><td><strong>RAG (pgvector)</strong></td><td>Retrieves <em>approved guidance</em> by similarity and cites it.</td><td><code>backend/app/rag/</code></td></tr>
+            <tr><td><strong>MCP tools</strong></td><td>Fetches <em>per-customer system data</em> via typed tool calls.</td><td><code>mcp_server/</code></td></tr>
+            <tr><td><strong>Guardrails</strong></td><td>Deterministic, code-only safety pass before anything is returned.</td><td><code>backend/app/guardrails/checks.py</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="ragmcp">
+      <span class="sec-num">05</span>
+      <h2>RAG vs MCP — the core distinction</h2>
+      <p>These two sources are deliberately separate, and the difference is the heart of the design. <strong>RAG grounds the answer in what Fidelity is allowed to say; MCP grounds it in what is true for this customer.</strong></p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th></th><th>RAG</th><th>MCP tools</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Answers</strong></td><td>"What does approved policy say?"</td><td>"What is true about <em>this</em> customer?"</td></tr>
+            <tr><td><strong>Content</strong></td><td>Static approved guidance (SOPs, forms, tax boundaries, escalation policy)</td><td>Live per-customer/system records</td></tr>
+            <tr><td><strong>Reached by</strong></td><td>Vector similarity search</td><td>Explicit tool call by name</td></tr>
+            <tr><td><strong>Cited?</strong></td><td>Yes — stable chunk ids in <code>rag_sources</code></td><td>Tracked in <code>tools_called</code> + raw <code>trace</code></td></tr>
+            <tr><td><strong>Source of truth</strong></td><td><code>data/rag_docs/*.md</code></td><td><code>mock_customers.json</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        <span class="lbl">Why it matters for the paths</span>
+        Path A uses <strong>both</strong> (guidance + live data). Path B uses <strong>RAG only</strong> and calls <em>no</em> MCP tools — which is exactly why its response shows <code>tools_called: []</code>.
+      </div>
+    </section>
+
+    <section id="mcp">
+      <span class="sec-num">06</span>
+      <h2>MCP tools &amp; data stores</h2>
+      <p>The MCP server (<code>mcp_server/server.py</code>, FastMCP over streamable-HTTP on <code>:8100</code>) exposes <strong>seven</strong> tools. Six are read-only and are the fixed list Path A calls on every customer-specific request; the seventh is a dry-run write that is <em>exposed but never auto-invoked</em> by the graph. Each takes a single <code>identifier</code> (a <code>CUST-####</code> id or a full/partial name) and returns a structured record — or <code>{ "found": false, … }</code> for an unknown id.</p>
+
+      <div class="note" style="border-left-color:var(--crit)">
+        <span class="lbl" style="color:var(--crit)">Which database? — none, for the tools</span>
+        The MCP tools do <strong>not</strong> query Postgres/pgvector. Every tool reads a single flat file, <code>mcp_server/data/mock_customers.json</code>, loaded per call by <code>_data.find_customer()</code> — no SQL, no connection pool. The <strong>Postgres + pgvector</strong> database is used <em>exclusively</em> by RAG (the <code>rag_chunks</code> table). That separation <em>is</em> the RAG-vs-MCP split: guidance lives in the vector DB, customer facts live behind the tools.
+      </div>
+
+      <h3>The two data stores</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Store</th><th>Technology</th><th>Holds</th><th>Touched by</th><th>Accessed how</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Guidance corpus</strong></td>
+              <td>Postgres + pgvector — <code>rag_chunks(chunk_id, doc_name, content, embedding vector(384))</code></td>
+              <td>Static approved guidance chunks (from <code>data/rag_docs/*.md</code>)</td>
+              <td>RAG retriever only (<code>retrieve_rag</code>)</td>
+              <td>Cosine similarity via the <code>&lt;=&gt;</code> operator</td>
+            </tr>
+            <tr>
+              <td><strong>Customer records</strong></td>
+              <td><code>mock_customers.json</code> (flat file; seeded by <code>scripts/seed_mock_data.py</code>)</td>
+              <td>Per-customer/system mock data (profile, accounts, plan, restrictions, docs, case)</td>
+              <td>All 7 MCP tools</td>
+              <td><code>find_customer()</code> reads the JSON per call — <strong>no database</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>The seven tools</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Tool</th><th>What it does</th><th>Returns (key fields)</th><th>Data source</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>get_customer_profile</code><br><span class="pill no">read</span></td>
+              <td>Profile lookup by <code>customer_id</code> (e.g. <code>CUST-1001</code>) or full name.</td>
+              <td><code>name</code>, <code>age</code>, <code>veteran_status</code>, <code>state</code>, <code>contact_preference</code>, <code>email</code>, <code>phone</code>, <code>ssn_last4</code>, <code>risk_flags</code></td>
+              <td><code>mock_customers.json</code></td>
+            </tr>
+            <tr>
+              <td><code>check_existing_ira</code><br><span class="pill no">read</span></td>
+              <td>Whether the customer already holds a Fidelity IRA.</td>
+              <td><code>has_existing_fidelity_ira</code>, <code>existing_iras[]</code></td>
+              <td><code>mock_customers.json</code></td>
+            </tr>
+            <tr>
+              <td><code>list_retirement_accounts</code><br><span class="pill no">read</span></td>
+              <td>The customer's existing Fidelity retirement accounts.</td>
+              <td><code>retirement_accounts[]</code></td>
+              <td><code>mock_customers.json</code></td>
+            </tr>
+            <tr>
+              <td><code>get_source_plan_details</code><br><span class="pill no">read</span></td>
+              <td>Old employer 401(k) source-plan details: provider, balance estimate, rollover eligibility, outstanding loan.</td>
+              <td><code>source_plan</code>, <code>rollover_allowed</code>, <code>outstanding_plan_loan</code>, <code>plan_details_complete</code></td>
+              <td><code>mock_customers.json</code></td>
+            </tr>
+            <tr>
+              <td><code>check_account_restrictions</code><br><span class="pill no">read</span></td>
+              <td>Restrictions / holds on the account (fraud hold, KYC, beneficiary dispute, address mismatch, blocked).</td>
+              <td><code>has_restrictions</code>, <code>account_restrictions[]</code></td>
+              <td><code>mock_customers.json</code></td>
+            </tr>
+            <tr>
+              <td><code>get_document_or_case_status</code><br><span class="pill no">read</span></td>
+              <td>Which required documents are received / pending / missing, plus identity verification and case status.</td>
+              <td><code>documents</code>, <code>missing_documents[]</code>, <code>incomplete_documents[]</code>, <code>identity_verification</code>, <code>case_status</code></td>
+              <td><code>mock_customers.json</code></td>
+            </tr>
+            <tr>
+              <td><code>create_or_update_service_case</code><br><span class="pill yes">dry-run write</span></td>
+              <td><strong>Simulated only.</strong> Would create/update a service case; performs no real action and persists nothing. Not auto-called by the graph.</td>
+              <td><code>simulated: true</code>, <code>case_id</code> (mock, deterministic <code>CASE-####-DEMO</code>), echoed <code>notes</code>, <code>message</code></td>
+              <td><code>mock_customers.json</code> (read for existence check only)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:15px">On Path A, <code>call_mcp_tools</code> invokes the <strong>six read tools</strong> as a fixed batch (that's the <code>6 tools</code> you see in <code>tools_called</code>). An unknown identifier returns <code>{ "found": false, "message": … }</code>, which short-circuits the graph to a clarification rather than guessing.</p>
+    </section>
+
+    <section id="router">
+      <span class="sec-num">07</span>
+      <h2>The router</h2>
+      <p>The router is deterministic code (no model call) in <code>classify_request</code>. It looks for rollover intent and whether a specific customer is named, then sets one path.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Request looks like…</th><th>Path chosen</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Rollover question <strong>+ a specific customer</strong> (id or name)</td><td><span class="pill no">A_augmented_llm</span></td><td>Needs live account data → MCP + RAG + reasoning</td></tr>
+            <tr><td>Rollover question <strong>with no specific customer</strong></td><td><span class="pill" style="background:var(--pathb-soft);color:#264a78">B_prompt_chain</span></td><td>A standard explanation → deterministic chain over approved guidance</td></tr>
+            <tr><td>Not a rollover request</td><td><span class="pill neutral">other</span></td><td>Falls into the clarification flow</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Because routing is deterministic, the same request always takes the same path — important for an auditable, compliance-sensitive system.</p>
+    </section>
+
+    <section id="graph">
+      <span class="sec-num">08</span>
+      <h2>The graph</h2>
+      <p>One LangGraph <code>StateGraph</code> holds both paths. They share the front (parse, classify, retrieve) and the tail (guardrails, format), and diverge in the middle.</p>
+
+      <div class="mini-h">Shared front</div>
+      <div class="rail">
+        <span class="step shared">parse_user_request</span><span class="arr">→</span>
+        <span class="step shared">classify_request <em>(router)</em></span><span class="arr">→</span>
+        <span class="step shared">retrieve_rag_documents</span><span class="arr">→</span>
+        <span class="step shared">route</span>
+      </div>
+
+      <div class="mini-h">Path A — Augmented LLM</div>
+      <div class="rail">
+        <span class="step a">decide_required_tools</span><span class="arr">→</span>
+        <span class="step a">call_mcp_tools</span><span class="arr">→</span>
+        <span class="step a">synthesize_rollover_plan</span>
+      </div>
+
+      <div class="mini-h">Path B — Controlled Prompt Chain</div>
+      <div class="rail">
+        <span class="step b">pb_gate <em>(validation)</em></span><span class="arr">→</span>
+        <span class="step b">pb_explain <em>(step 1)</em></span><span class="arr">→</span>
+        <span class="step b">pb_build_checklist <em>(step 2)</em></span>
+      </div>
+
+      <div class="mini-h">Shared tail</div>
+      <div class="rail">
+        <span class="step shared">guardrails_check</span><span class="arr">→</span>
+        <span class="step shared">format_final_response</span><span class="arr">→</span>
+        <span class="step shared">END</span>
+      </div>
+
+      <p style="margin-top:18px">Three places can short-circuit straight to <code>format</code> with a clarification: no customer identifier (<code>decide_required_tools</code>), customer not found (<code>call_mcp_tools</code>), or no grounding available (<code>pb_gate</code>). Every node appends to a <code>trace</code> the UI can show.</p>
+    </section>
+
+    <section id="flows">
+      <span class="sec-num">09</span>
+      <h2>The four flows</h2>
+      <p>Each card is a real prompt run against the demo, with the path taken, the step trace, and the response fields that matter. (Outputs shown are from the offline deterministic synthesizer; with an OpenAI key the prose is richer but the shape is identical.)</p>
+
+      <!-- FLOW 1 -->
+      <div class="flow">
+        <div class="flow-head">
+          <span class="fno" style="color:var(--accent)">1</span>
+          <h3>Clean rollover — customer in good standing</h3>
+          <span class="badge a">PATH A · no escalation</span>
+        </div>
+        <div class="flow-body">
+          <p class="prompt">"Customer Robert Miller is a 65-year-old army veteran. He wants to roll over an old 401(k) into a Fidelity IRA. Check what is needed, whether he already has an IRA, restrictions, forms, and draft a compliant response." &nbsp;<code>customer_id: CUST-1001</code></p>
+          <div class="mini-h">Path taken</div>
+          <div class="rail">
+            <span class="step shared">parse</span><span class="arr">→</span>
+            <span class="step shared">classify → A</span><span class="arr">→</span>
+            <span class="step shared">retrieve_rag</span><span class="arr">→</span>
+            <span class="step a">decide_tools</span><span class="arr">→</span>
+            <span class="step a">call_mcp_tools ×6</span><span class="arr">→</span>
+            <span class="step a">synthesize</span><span class="arr">→</span>
+            <span class="step shared">guardrails</span><span class="arr">→</span>
+            <span class="step shared">format</span>
+          </div>
+          <div class="mini-h">What the tools returned</div>
+          <p style="font-size:15px">No existing Fidelity IRA · source 401(k) at Example Benefits Plan Services · <strong>rollover allowed</strong> · no plan loan · <strong>no restrictions</strong> · identity verified · IRA application &amp; rollover form still missing.</p>
+          <div class="mini-h">Response (key fields)</div>
+          <dl class="kv">
+            <dt>path</dt><dd><span class="pill no">A_augmented_llm</span></dd>
+            <dt>escalation</dt><dd><span class="pill no">false</span></dd>
+            <dt>tools_called</dt><dd>6 (profile, ira, accounts, plan, restrictions, docs)</dd>
+            <dt>rag_sources</dt><dd><code>IRA-OPEN-02</code>, <code>ROLLOVER-SOP-01</code>, <code>APPROVED-LANG-03</code>, <code>FORMS-03</code></dd>
+          </dl>
+          <div class="mini-h">answer</div>
+          <p style="font-size:15px">"…the associate can first confirm that Robert Miller does not currently have a Fidelity IRA. The next step is to guide the customer through opening an IRA before initiating the rollover request from the old Example Benefits Plan Services 401(k). The source plan shows rollover eligibility as allowed and no restrictions or outstanding plan loan, so the case can proceed with standard next steps…"</p>
+          <div class="two-col">
+            <div>
+              <div class="mini-h">next steps</div>
+              <ul class="clean">
+                <li>Confirm no suitable IRA exists, then open a Fidelity IRA first.</li>
+                <li>Request source-plan paperwork from the provider.</li>
+                <li>Complete the rollover request form once the IRA exists.</li>
+                <li>Prefer a direct rollover; route indirect for review.</li>
+                <li>Refer tax questions to a qualified professional.</li>
+              </ul>
+            </div>
+            <div>
+              <div class="mini-h">required forms</div>
+              <ul class="clean">
+                <li>Fidelity IRA application (IRA opened first)</li>
+                <li>Source-plan rollover/distribution paperwork</li>
+                <li>Fidelity rollover request form</li>
+              </ul>
+              <div class="mini-h">customer draft</div>
+              <p style="font-size:14px;color:var(--muted)">PII-safe, neutral, defers tax to a professional.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FLOW 2 -->
+      <div class="flow">
+        <div class="flow-head">
+          <span class="fno" style="color:var(--crit)">2</span>
+          <h3>Higher-risk account — must escalate</h3>
+          <span class="badge crit">PATH A · escalation</span>
+        </div>
+        <div class="flow-body">
+          <p class="prompt">"Customer wants to roll over a 401(k) into a Fidelity IRA. Check restrictions and draft a response." &nbsp;<code>customer_id: CUST-2002</code></p>
+          <div class="mini-h">Path taken</div>
+          <div class="rail">
+            <span class="step shared">parse</span><span class="arr">→</span>
+            <span class="step shared">classify → A</span><span class="arr">→</span>
+            <span class="step shared">retrieve_rag</span><span class="arr">→</span>
+            <span class="step a">call_mcp_tools ×6</span><span class="arr">→</span>
+            <span class="step a">synthesize</span><span class="arr">→</span>
+            <span class="step crit">guardrails → escalate</span><span class="arr">→</span>
+            <span class="step shared">format</span>
+          </div>
+          <div class="mini-h">Why it escalates</div>
+          <p style="font-size:15px">The same six tools run, but the data trips the escalation rules: beneficiary dispute, address mismatch, an outstanding plan loan, unknown rollover eligibility, and incomplete identity verification.</p>
+          <div class="mini-h">Response (key fields)</div>
+          <dl class="kv">
+            <dt>path</dt><dd><span class="pill no">A_augmented_llm</span></dd>
+            <dt>escalation</dt><dd><span class="pill yes">true</span> · 8 reasons</dd>
+            <dt>next_steps</dt><dd>Pause processing → escalate to a specialist (not clean proceed-as-normal steps)</dd>
+          </dl>
+          <div class="mini-h">escalation_reasons</div>
+          <ul class="clean" style="font-size:14.5px">
+            <li>Account restriction: beneficiary dispute</li>
+            <li>Account restriction: address mismatch</li>
+            <li>Outstanding loan against the source 401(k) plan</li>
+            <li>Rollover eligibility is 'unknown' (not confirmed allowed)</li>
+            <li>Source-plan details are incomplete or unavailable</li>
+            <li>Identity verification is 'incomplete'</li>
+            <li>Risk flags: beneficiary_dispute, address_mismatch</li>
+          </ul>
+          <div class="note" style="border-left-color:var(--crit)">
+            <span class="lbl" style="color:var(--crit)">The contrast that sells the demo</span>
+            Same workflow, same tools, opposite outcome. Missing <em>forms</em> alone never escalates (that's normal servicing) — but restrictions, loans, unknown eligibility, or incomplete identity do.
+          </div>
+        </div>
+      </div>
+
+      <!-- FLOW 3 -->
+      <div class="flow">
+        <div class="flow-head">
+          <span class="fno" style="color:var(--pathb)">3</span>
+          <h3>General explanation — no specific customer</h3>
+          <span class="badge b">PATH B · prompt chain</span>
+        </div>
+        <div class="flow-body">
+          <p class="prompt">"Explain how a 401(k) to IRA rollover works and what forms are needed." &nbsp;<code>(no customer_id)</code></p>
+          <div class="mini-h">Path taken</div>
+          <div class="rail">
+            <span class="step shared">parse</span><span class="arr">→</span>
+            <span class="step shared">classify → B</span><span class="arr">→</span>
+            <span class="step shared">retrieve_rag</span><span class="arr">→</span>
+            <span class="step b">pb_gate · topic=required_forms</span><span class="arr">→</span>
+            <span class="step b">pb_explain</span><span class="arr">→</span>
+            <span class="step b">pb_build_checklist</span><span class="arr">→</span>
+            <span class="step shared">guardrails</span><span class="arr">→</span>
+            <span class="step shared">format</span>
+          </div>
+          <div class="mini-h">How the chain works</div>
+          <p style="font-size:15px"><strong>pb_gate</strong> confirms there's grounding (fail-fast if not) and picks a sub-topic. <strong>pb_explain</strong> drafts a cited plain-language explanation. <strong>pb_build_checklist</strong> consumes that explanation and produces the standard steps + forms. Each step has a deterministic fallback, so it runs with no API key.</p>
+          <div class="mini-h">Response (key fields)</div>
+          <dl class="kv">
+            <dt>path</dt><dd><span class="pill" style="background:var(--pathb-soft);color:#264a78">B_prompt_chain</span></dd>
+            <dt>tools_called</dt><dd><span class="pill neutral">[ ] — no MCP, by design</span></dd>
+            <dt>escalation</dt><dd><span class="pill no">false</span> (no customer data to assess)</dd>
+            <dt>rag_sources</dt><dd><code>ROLLOVER-SOP-01</code>, <code>FORMS-06</code>, <code>FORMS-01</code>, <code>IRA-OPEN-02</code></dd>
+          </dl>
+          <div class="mini-h">answer</div>
+          <p style="font-size:15px">"A standard 401(k)-to-IRA rollover typically requires the source plan's rollover/distribution paperwork, a Fidelity IRA application if no suitable IRA exists yet, and a Fidelity rollover request form. Identity verification must be complete before servicing proceeds. (Grounded in approved guidance: [ROLLOVER-SOP-01, FORMS-06, …].)"</p>
+          <div class="note" style="border-left-color:var(--pathb)">
+            <span class="lbl" style="color:#264a78">The teaching point</span>
+            Same front door, different engine. Customer-specific → Path A (live data + reasoning). Standard explanation → Path B (predictable, cheaper, <em>no</em> system access). One router, one contract, two engines.
+          </div>
+        </div>
+      </div>
+
+      <!-- FLOW 4 -->
+      <div class="flow">
+        <div class="flow-head">
+          <span class="fno" style="color:var(--clarify)">4</span>
+          <h3>Customer not found — ask, don't guess</h3>
+          <span class="badge clar">CLARIFICATION</span>
+        </div>
+        <div class="flow-body">
+          <p class="prompt">"Roll over a 401(k) into an IRA." &nbsp;<code>customer_id: CUST-9999</code></p>
+          <div class="mini-h">Path taken</div>
+          <div class="rail">
+            <span class="step shared">parse</span><span class="arr">→</span>
+            <span class="step shared">classify → A</span><span class="arr">→</span>
+            <span class="step shared">retrieve_rag</span><span class="arr">→</span>
+            <span class="step a">decide_tools</span><span class="arr">→</span>
+            <span class="step a">call_mcp_tools</span><span class="arr">→</span>
+            <span class="step clar">not found</span><span class="arr">→</span>
+            <span class="step shared">format</span>
+          </div>
+          <div class="mini-h">Response (key fields)</div>
+          <dl class="kv">
+            <dt>clarification_needed</dt><dd><span class="pill" style="background:var(--clarify-soft);color:#5f5645">true</span></dd>
+            <dt>answer</dt><dd>"I couldn't locate a customer record for 'CUST-9999'. Please confirm the customer identifier (e.g. CUST-1001) or full name."</dd>
+            <dt>escalation</dt><dd><span class="pill no">false</span></dd>
+          </dl>
+          <p style="font-size:15px">The same short-circuit fires when no identifier is given at all, or — on Path B — when no approved guidance can be retrieved to ground an answer. The copilot never fabricates a customer or an answer it can't support.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="guardrails">
+      <span class="sec-num">10</span>
+      <h2>Guardrails &amp; escalation</h2>
+      <p>Guardrails are deterministic, code-only checks that run on <em>both</em> paths after synthesis — so the model can't talk its way past them. They are a lightweight stand-in for the future skill-based validation chain.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Check</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td>No investment advice</td><td>Flags / neutralizes "you should invest", "allocate X%", "best fund".</td></tr>
+            <tr><td>No tax/legal advice</td><td>Flags tax-outcome claims; defers to a qualified tax professional.</td></tr>
+            <tr><td>No trade / money movement</td><td>Flags "execute the trade", "move your funds".</td></tr>
+            <tr><td>PII redaction</td><td>Redacts SSN, account numbers, email, phone from the <em>customer draft</em> (associate still sees raw values in findings/trace).</td></tr>
+            <tr><td>Grounding</td><td>Ensures <code>rag_sources</code> is populated.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Escalation triggers</h3>
+      <p>Escalation reasons are computed from MCP data. Any one of these escalates; missing application/rollover <em>forms</em> do <strong>not</strong> (those are normal next steps):</p>
+      <ul class="clean">
+        <li>Account restriction — fraud hold, KYC gap, beneficiary dispute, address mismatch, blocked account</li>
+        <li>Outstanding loan against the source 401(k) plan</li>
+        <li>Rollover eligibility unknown or not allowed</li>
+        <li>Identity verification missing or incomplete</li>
+        <li>Source-plan details unavailable, or customer record not found</li>
+      </ul>
+    </section>
+
+    <section id="api">
+      <span class="sec-num">11</span>
+      <h2>API contract</h2>
+      <p>The UI relies on these top-level fields; <code>trace</code> is informational (full step log, raw tool results, model mode).</p>
+      <div class="mini-h">POST /chat — request</div>
+      <pre><span class="b">{</span>
+  <span class="k">"message"</span>: <span class="s">"Customer Robert Miller wants to roll over an old 401(k)…"</span>,
+  <span class="k">"customer_id"</span>: <span class="s">"CUST-1001"</span>,   <span class="c">// optional if named in message</span>
+  <span class="k">"session_id"</span>: <span class="s">"demo-session-1"</span>
+<span class="b">}</span></pre>
+      <div class="mini-h">POST /chat — response</div>
+      <pre><span class="b">{</span>
+  <span class="k">"path"</span>: <span class="s">"A_augmented_llm"</span>,        <span class="c">// or "B_prompt_chain"</span>
+  <span class="k">"answer"</span>: <span class="s">"associate-ready narrative"</span>,
+  <span class="k">"case_summary"</span>: <span class="s">"…"</span>,
+  <span class="k">"findings"</span>: <span class="b">[</span> <span class="b">{</span> <span class="k">"label"</span>:<span class="s">"Existing Fidelity IRA"</span>, <span class="k">"value"</span>:<span class="s">"None on file"</span>, <span class="k">"source"</span>:<span class="s">"check_existing_ira"</span> <span class="b">}</span> <span class="b">]</span>,
+  <span class="k">"next_steps"</span>: <span class="b">[</span> <span class="s">"…"</span> <span class="b">]</span>,
+  <span class="k">"required_forms"</span>: <span class="b">[</span> <span class="s">"…"</span> <span class="b">]</span>,
+  <span class="k">"customer_draft"</span>: <span class="s">"PII-redacted draft the associate reviews"</span>,
+  <span class="k">"compliance_notes"</span>: <span class="b">[</span> <span class="s">"…"</span> <span class="b">]</span>,
+  <span class="k">"escalation_required"</span>: <span class="b">false</span>,
+  <span class="k">"escalation_reasons"</span>: <span class="b">[]</span>,
+  <span class="k">"clarification_needed"</span>: <span class="b">false</span>,
+  <span class="k">"rag_sources"</span>: <span class="b">[</span> <span class="b">{</span> <span class="k">"chunk_id"</span>:<span class="s">"ROLLOVER-SOP-01"</span>, <span class="k">"doc"</span>:<span class="s">"rollover_sop.md"</span>, <span class="k">"score"</span>:0.32 <span class="b">}</span> <span class="b">]</span>,
+  <span class="k">"tools_called"</span>: <span class="b">[</span> <span class="b">{</span> <span class="k">"tool"</span>:<span class="s">"get_customer_profile"</span>, <span class="k">"status"</span>:<span class="s">"ok"</span> <span class="b">}</span> <span class="b">]</span>,
+  <span class="k">"trace"</span>: <span class="b">{</span> <span class="k">"classification"</span>:…, <span class="k">"steps"</span>:[…], <span class="k">"tool_results"</span>:…, <span class="k">"model_mode"</span>:<span class="s">"fallback"</span> <span class="b">}</span>
+<span class="b">}</span></pre>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Endpoint</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>POST /chat</code></td><td>Run the copilot; returns the contract above.</td></tr>
+            <tr><td><code>GET /health</code></td><td>db, mcp, model_mode, corpus_chunks, default_model.</td></tr>
+            <tr><td><code>GET /customers</code></td><td>List mock customers (demo convenience; non-agent path).</td></tr>
+            <tr><td><code>GET /customers/{id}</code></td><td>Full mock record.</td></tr>
+            <tr><td><code>POST /ingest</code></td><td>Re-ingest the approved RAG docs into pgvector.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="data">
+      <span class="sec-num">12</span>
+      <h2>Mock customers</h2>
+      <p>Two seeded records drive the two Path-A outcomes.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Field</th><th>CUST-1001 · Robert Miller</th><th>CUST-2002 · Patricia Donovan</th></tr></thead>
+          <tbody>
+            <tr><td>Existing Fidelity IRA</td><td>No</td><td>Yes</td></tr>
+            <tr><td>Rollover allowed</td><td class="tnum">true</td><td class="tnum">unknown</td></tr>
+            <tr><td>Outstanding plan loan</td><td>No</td><td>Yes</td></tr>
+            <tr><td>Restrictions</td><td>None</td><td>Beneficiary dispute, address mismatch</td></tr>
+            <tr><td>Identity verification</td><td>Complete</td><td>Incomplete</td></tr>
+            <tr><td>Outcome</td><td><span class="pill no">clean</span></td><td><span class="pill yes">escalates</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="run">
+      <span class="sec-num">13</span>
+      <h2>Run it locally</h2>
+      <pre><span class="c"># 1 · database (Postgres + pgvector)</span>
+docker compose up -d
+
+<span class="c"># 2 · dependencies</span>
+python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -r backend/requirements.txt -r mcp_server/requirements.txt
+
+<span class="c"># 3 · env + seed + ingest</span>
+cp .env.example .env          <span class="c"># optional: set OPENAI_API_KEY for live LLM</span>
+python scripts/seed_mock_data.py
+python scripts/ingest_docs.py  <span class="c"># 6 docs → 32 chunks</span>
+
+<span class="c"># 4 · MCP tool server (terminal A)</span>
+python mcp_server/server.py    <span class="c"># streamable-HTTP on :8100</span>
+
+<span class="c"># 5 · backend (terminal B)</span>
+uvicorn app.main:app --app-dir backend --port 8080
+
+<span class="c"># 6 · test — all four flows</span>
+bash scripts/smoke_test.sh     <span class="c"># 14 checks</span></pre>
+      <div class="note">
+        <span class="lbl">Zero-key by default</span>
+        With no <code>OPENAI_API_KEY</code>, synthesis uses a deterministic offline template; with no <code>sentence-transformers</code>, embeddings use a deterministic hash. pgvector search and MCP calls are real either way — so the demo always runs.
+      </div>
+    </section>
+
+    <section id="status">
+      <span class="sec-num">14</span>
+      <h2>Built vs future</h2>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Component</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Path A — Augmented LLM</td><td><span class="pill no">built</span></td></tr>
+            <tr><td>Router + Path B — Controlled Prompt Chain</td><td><span class="pill no">built</span></td></tr>
+            <tr><td>Lightweight deterministic guardrails</td><td><span class="pill no">built</span></td></tr>
+            <tr><td>Skill-based validation prompt chain (PII / advice / compliance / citation / escalation skills, with a <code>skills_used</code> audit trail)</td><td><span class="pill neutral">future</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The remaining scaffold item replaces the code-only guardrails with a versioned, skill-based validation chain — the natural next graduation of the safety layer.</p>
+    </section>
+  </main>
+</div>
+
+<footer>
+  Fidelity Retirement Servicing Copilot — local demo · associate-facing, human-in-the-loop, grounded &amp; bounded. Mock data only; no real Fidelity systems.
+</footer>
+
+<script>
+  // Highlight the current section in the contents rail.
+  (function(){
+    var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+    var map = {};
+    links.forEach(function(a){ map[a.getAttribute('href').slice(1)] = a; });
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){
+          links.forEach(function(l){ l.classList.remove('active'); });
+          var a = map[e.target.id];
+          if(a) a.classList.add('active');
+        }
+      });
+    }, {rootMargin:'-12% 0px -78% 0px', threshold:0});
+    document.querySelectorAll('main section').forEach(function(s){ obs.observe(s); });
+  })();
+</script>
