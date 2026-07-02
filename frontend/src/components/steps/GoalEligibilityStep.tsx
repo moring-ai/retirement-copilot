@@ -12,6 +12,7 @@ import { useSimulatedAgentRun } from '@/hooks/useSimulatedAgentRun'
 import { ROLLOVER_GOALS } from '@/data/goals'
 import { StepHeader } from './StepHeader'
 import { StickyActionBar } from '@/components/layout/StickyActionBar'
+import { StepNav } from '@/components/layout/StepNav'
 import { CustomerDetailsCard } from '@/components/eligibility/CustomerDetailsCard'
 import { EligibilityResultCard } from '@/components/eligibility/EligibilityResultCard'
 import { RolloverPathCard } from '@/components/eligibility/RolloverPathCard'
@@ -190,44 +191,20 @@ export function GoalEligibilityStep({ customer }: { customer: Customer }) {
 
       {/* --- Sticky submit bar --- */}
       <StickyActionBar>
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-ink">
-            {hasResult ? 'Eligibility check complete' : 'Run eligibility check'}
-          </p>
-          <p className="truncate text-xs text-muted-foreground">
-            {goal
-              ? `Goal: ${goal.label}`
-              : 'Select a goal to enable the check'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+        <StepNav>
           <Button
             variant={hasResult ? 'outline' : 'default'}
             disabled={!goal || runningAction !== null}
             onClick={() => run('eligibility')}
           >
-            {running ? (
-              <Loader2 className="animate-spin" />
-            ) : (
-              <ShieldCheck />
-            )}
+            {running ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
             {running
               ? 'Agent working…'
               : hasResult
                 ? 'Re-run check'
                 : 'Run Eligibility Check'}
           </Button>
-          {hasResult && (
-            <Button
-              onClick={() =>
-                dispatch({ type: 'SELECT_STEP', step: 'required_forms' })
-              }
-            >
-              Continue
-              <ArrowRight />
-            </Button>
-          )}
-        </div>
+        </StepNav>
       </StickyActionBar>
     </div>
   )

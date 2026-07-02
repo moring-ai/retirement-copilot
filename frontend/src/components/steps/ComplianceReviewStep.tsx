@@ -9,7 +9,6 @@ import {
   Ban,
   UserCog,
   ArrowUpRight,
-  ArrowRight,
   type LucideIcon,
 } from 'lucide-react'
 import type {
@@ -23,6 +22,7 @@ import { CUSTOMERS } from '@/data/customers'
 import { goalLabel } from '@/data/goals'
 import { StepHeader } from './StepHeader'
 import { StickyActionBar } from '@/components/layout/StickyActionBar'
+import { StepNav } from '@/components/layout/StepNav'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -90,7 +90,7 @@ const SEVERITY_RANK: Record<IssueSeverity, number> = {
 }
 
 export function ComplianceReviewStep() {
-  const { state, dispatch } = useWorkspace()
+  const { state } = useWorkspace()
   const { run, runningAction } = useSimulatedAgentRun()
   const status = state.stepStatuses.compliance_review
   const hasRun = status === 'complete' || status === 'needs_info'
@@ -242,14 +242,7 @@ export function ComplianceReviewStep() {
       )}
 
       <StickyActionBar>
-        <p className="min-w-0 truncate text-sm text-muted-foreground">
-          {hasRun
-            ? escalation
-              ? 'Blockers found — review recommendations before proceeding.'
-              : 'Cleared. Continue to draft the response.'
-            : 'Run the compliance check to continue.'}
-        </p>
-        <div className="flex items-center gap-2">
+        <StepNav>
           {hasRun && (
             <Button variant="outline" onClick={downloadReport}>
               <Download />
@@ -268,15 +261,7 @@ export function ComplianceReviewStep() {
                 ? 'Re-run check'
                 : 'Check Compliance'}
           </Button>
-          {hasRun && (
-            <Button
-              onClick={() => dispatch({ type: 'SELECT_STEP', step: 'response' })}
-            >
-              Continue
-              <ArrowRight />
-            </Button>
-          )}
-        </div>
+        </StepNav>
       </StickyActionBar>
     </div>
   )

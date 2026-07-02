@@ -3,12 +3,14 @@ import { Plus, Search, FolderOpen, ShieldCheck } from 'lucide-react'
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { CURRENT_ASSOCIATE } from '@/data/cases'
 import { CaseCard } from './CaseCard'
+import { NewCaseDialog } from './NewCaseDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
 export function CaseHome() {
   const { state, dispatch } = useWorkspace()
   const [query, setQuery] = useState('')
+  const [newCaseOpen, setNewCaseOpen] = useState(false)
   // Stable "now" for this render pass so every relative time lines up.
   const now = useMemo(() => Date.now(), [state.cases])
 
@@ -44,7 +46,7 @@ export function CaseHome() {
               Pick up an open case or start a new rollover servicing case.
             </p>
           </div>
-          <Button size="lg" onClick={() => dispatch({ type: 'NEW_CASE' })}>
+          <Button size="lg" onClick={() => setNewCaseOpen(true)}>
             <Plus />
             New Case
           </Button>
@@ -101,7 +103,7 @@ export function CaseHome() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => dispatch({ type: 'NEW_CASE' })}
+                onClick={() => setNewCaseOpen(true)}
               >
                 <Plus />
                 New Case
@@ -131,6 +133,8 @@ export function CaseHome() {
           Associate-facing · human-in-the-loop · mock data only
         </div>
       </div>
+
+      <NewCaseDialog open={newCaseOpen} onOpenChange={setNewCaseOpen} />
     </div>
   )
 }

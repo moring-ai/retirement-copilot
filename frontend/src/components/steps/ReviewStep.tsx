@@ -17,6 +17,7 @@ import { CUSTOMERS } from '@/data/customers'
 import { goalLabel } from '@/data/goals'
 import { StepHeader } from './StepHeader'
 import { StickyActionBar } from '@/components/layout/StickyActionBar'
+import { StepNav } from '@/components/layout/StepNav'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -182,45 +183,26 @@ export function ReviewStep() {
       </div>
 
       <StickyActionBar>
-        <div className="flex items-center gap-3">
-          <span
-            className={cn(
-              'flex h-9 w-9 items-center justify-center rounded-full',
-              submitted
-                ? 'bg-brand-soft text-brand-dark'
-                : ready
-                  ? 'bg-brand-soft text-brand-dark'
-                  : 'bg-muted text-muted-foreground',
-            )}
-          >
-            {submitted ? <CheckCircle2 className="h-5 w-5" /> : <Send className="h-5 w-5" />}
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-ink">
-              {submitted
-                ? 'Submitted for review'
-                : ready
-                  ? 'Ready to submit'
-                  : 'Complete the case to submit'}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {submitted
-                ? 'Sent to a retirement servicing reviewer.'
+        <StepNav>
+          <span className="mr-auto hidden text-xs text-muted-foreground sm:inline">
+            {submitted
+              ? 'Submitted to a retirement servicing reviewer.'
+              : ready
+                ? 'Ready to submit.'
                 : 'Identity, goal, eligibility, and an approved response are required.'}
-            </p>
-          </div>
-        </div>
-        {submitted ? (
-          <Button variant="outline" onClick={() => dispatch({ type: 'GO_HOME' })}>
-            <Home />
-            Back to Cases
-          </Button>
-        ) : (
-          <Button disabled={!ready} onClick={submit}>
-            <Send />
-            Submit to Review
-          </Button>
-        )}
+          </span>
+          {submitted ? (
+            <Button variant="outline" onClick={() => dispatch({ type: 'GO_HOME' })}>
+              <Home />
+              Back to Cases
+            </Button>
+          ) : (
+            <Button disabled={!ready} onClick={submit}>
+              <Send />
+              Submit to Review
+            </Button>
+          )}
+        </StepNav>
       </StickyActionBar>
     </div>
   )

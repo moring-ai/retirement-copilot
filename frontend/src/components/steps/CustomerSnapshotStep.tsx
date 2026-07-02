@@ -1,11 +1,11 @@
-import { User, Landmark, Wallet, ArrowRight, ShieldCheck } from 'lucide-react'
+import { User, Landmark, Wallet, ShieldCheck } from 'lucide-react'
 import type { Customer } from '@/types'
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { StepHeader } from './StepHeader'
 import { IdentityGate } from '@/components/customer/IdentityGate'
 import { StickyActionBar } from '@/components/layout/StickyActionBar'
+import { StepNav } from '@/components/layout/StepNav'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency } from '@/lib/utils'
 import { toast } from '@/components/ui/use-toast'
@@ -153,21 +153,15 @@ export function CustomerSnapshotStep({ customer }: { customer: Customer }) {
             </Card>
           </div>
 
-          <StickyActionBar>
-            <p className="text-sm text-muted-foreground">
-              Profile confirmed — continue to capture the rollover goal.
-            </p>
-            <Button
-              onClick={() =>
-                dispatch({ type: 'SELECT_STEP', step: 'goal_eligibility' })
-              }
-            >
-              Continue to Goal &amp; Eligibility
-              <ArrowRight />
-            </Button>
-          </StickyActionBar>
         </>
       )}
+
+      <StickyActionBar>
+        <StepNav
+          nextDisabled={!state.identityVerified}
+          nextHint="Verify the customer to continue"
+        />
+      </StickyActionBar>
     </div>
   )
 }

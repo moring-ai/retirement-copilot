@@ -3,15 +3,14 @@ import {
   FileText,
   CheckCircle2,
   Circle,
-  ArrowRight,
   AlertTriangle,
 } from 'lucide-react'
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { StepHeader } from './StepHeader'
 import { StickyActionBar } from '@/components/layout/StickyActionBar'
+import { StepNav } from '@/components/layout/StepNav'
 import { ResponseEditor } from '@/components/response/ResponseEditor'
 import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 function ApprovalRow({
@@ -100,12 +99,15 @@ export function ResponseStep() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <ApprovalRow
             checked={state.responseApproved}
-            onToggle={() =>
+            onToggle={() => {
+              const next = !state.responseApproved
+              dispatch({ type: 'SET_RESPONSE_APPROVED', approved: next })
               dispatch({
-                type: 'SET_RESPONSE_APPROVED',
-                approved: !state.responseApproved,
+                type: 'SET_STEP_STATUS',
+                step: 'response',
+                status: next ? 'complete' : 'in_progress',
               })
-            }
+            }}
             title="Approve the response"
             hint="I have reviewed and approve this customer response."
           />
@@ -126,25 +128,16 @@ export function ResponseStep() {
       )}
 
       <StickyActionBar>
-        <p className="min-w-0 truncate text-sm text-muted-foreground">
-          {!hasDraft
-            ? 'Generate a response to continue.'
-            : canContinue
-              ? 'Approved — continue to the final review.'
+        <StepNav
+          nextDisabled={!canContinue}
+          nextHint={
+            !hasDraft
+              ? 'Generate a response first'
               : docNeeded
-                ? 'Approve the response and the attached report.'
-                : 'Approve the response to continue.'}
-        </p>
-        <Button
-          disabled={!canContinue}
-          onClick={() => {
-            dispatch({ type: 'SET_STEP_STATUS', step: 'response', status: 'complete' })
-            dispatch({ type: 'SELECT_STEP', step: 'review' })
-          }}
-        >
-          Continue to Review
-          <ArrowRight />
-        </Button>
+                ? 'Approve the response and report'
+                : 'Approve the response to continue'
+          }
+        />
       </StickyActionBar>
     </div>
   )

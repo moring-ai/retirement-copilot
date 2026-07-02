@@ -4,12 +4,12 @@ import {
   Loader2,
   CheckCircle2,
   ShieldCheck,
-  ArrowRight,
 } from 'lucide-react'
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { useSimulatedAgentRun } from '@/hooks/useSimulatedAgentRun'
 import { StepHeader } from './StepHeader'
 import { StickyActionBar } from '@/components/layout/StickyActionBar'
+import { StepNav } from '@/components/layout/StepNav'
 import { MissingInformationCard } from '@/components/eligibility/MissingInformationCard'
 import { FormUploadCard, reviewComments } from '@/components/forms/FormUploadCard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -90,12 +90,7 @@ export function RequiredFormsStep() {
       {hasRun && <FormUploadCard />}
 
       <StickyActionBar>
-        <p className="min-w-0 truncate text-sm text-muted-foreground">
-          {hasRun
-            ? 'Upload filled-in forms, then validate them with AI.'
-            : 'Build the required-forms checklist to begin.'}
-        </p>
-        <div className="flex items-center gap-2">
+        <StepNav>
           <Button
             variant={hasRun ? 'outline' : 'default'}
             disabled={runningAction !== null || !eligibilityDone}
@@ -118,17 +113,7 @@ export function RequiredFormsStep() {
               Validate Required Forms
             </Button>
           )}
-          {hasRun && (
-            <Button
-              onClick={() =>
-                dispatch({ type: 'SELECT_STEP', step: 'compliance_review' })
-              }
-            >
-              Continue
-              <ArrowRight />
-            </Button>
-          )}
-        </div>
+        </StepNav>
       </StickyActionBar>
     </div>
   )
