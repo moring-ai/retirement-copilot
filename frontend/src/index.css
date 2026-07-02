@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Palette carried over from the existing Fidelity-style demo decks,
+       mapped onto shadcn's semantic CSS variables (HSL triplets). */
+    --background: 220 33% 97%; /* #f5f7fb */
+    --foreground: 213 45% 15%; /* #15233b */
+
+    --card: 0 0% 100%; /* #ffffff */
+    --card-foreground: 213 45% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 213 45% 15%;
+
+    --border: 219 30% 91%; /* #e4e9f1 */
+    --input: 219 30% 91%;
+    --ring: 154 65% 29%; /* brand green focus ring */
+
+    --primary: 154 65% 29%; /* #1a7a4c brand green */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 202 69% 33%; /* #1a5d8c accent blue */
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 220 30% 95%;
+    --muted-foreground: 216 17% 50%; /* #6c7a93 */
+
+    --accent: 205 60% 94%; /* soft blue hover surface */
+    --accent-foreground: 202 69% 25%;
+
+    --destructive: 350 68% 33%; /* #8b1a2a */
+    --destructive-foreground: 0 0% 100%;
+
+    --radius: 1rem; /* 16px */
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+}
+
+@layer utilities {
+  /* Slim scrollbars for the workspace panels */
+  .scrollbar-slim::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-slim::-webkit-scrollbar-thumb {
+    background: hsl(219 22% 82%);
+    border-radius: 999px;
+  }
+  .scrollbar-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
