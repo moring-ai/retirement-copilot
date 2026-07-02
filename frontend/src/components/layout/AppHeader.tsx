@@ -2,6 +2,8 @@ import { Save, FileDown, ShieldCheck, ArrowLeft, Clock3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/use-toast'
 import { EvidenceDrawerToggle } from './EvidenceDrawerToggle'
+import { NotificationsMenu } from './NotificationsMenu'
+import { ProfileMenu } from './ProfileMenu'
 import { StageBadge } from '@/components/home/StageBadge'
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { CUSTOMERS } from '@/data/customers'
@@ -43,53 +45,59 @@ export function AppHeader() {
           </p>
         </div>
 
-        {inWorkspace && (
-          <div className="ml-auto flex items-center gap-2 lg:gap-3">
-            {activeCase && (
-              <div className="hidden items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 md:flex">
-                <StageBadge stage={activeCase.stage} />
-                <span className="h-3 w-px bg-border" />
-                <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                  <Clock3 className="h-3 w-3" />
-                  {timeAgo(activeCase.lastUpdatedAt)} · {activeCase.lastUpdatedBy}
-                </span>
+        <div className="ml-auto flex items-center gap-2 lg:gap-3">
+          {inWorkspace && (
+            <>
+              {activeCase && (
+                <div className="hidden items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 md:flex">
+                  <StageBadge stage={activeCase.stage} />
+                  <span className="h-3 w-px bg-border" />
+                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <Clock3 className="h-3 w-3" />
+                    {timeAgo(activeCase.lastUpdatedAt)} · {activeCase.lastUpdatedBy}
+                  </span>
+                </div>
+              )}
+
+              <div className="hidden items-center gap-2 lg:flex">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    toast({
+                      variant: 'info',
+                      title: 'Case saved',
+                      description: `${activeCase?.id ?? customer.customer_id} saved to your queue.`,
+                    })
+                  }
+                >
+                  <Save />
+                  Save
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    toast({
+                      variant: 'info',
+                      title: 'Summary exported',
+                      description: 'Case summary prepared for download.',
+                    })
+                  }
+                >
+                  <FileDown />
+                  Export
+                </Button>
               </div>
-            )}
 
-            <div className="hidden items-center gap-2 lg:flex">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  toast({
-                    variant: 'info',
-                    title: 'Case saved',
-                    description: `${activeCase?.id ?? customer.customer_id} saved to your queue.`,
-                  })
-                }
-              >
-                <Save />
-                Save
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  toast({
-                    variant: 'info',
-                    title: 'Summary exported',
-                    description: 'Case summary prepared for download.',
-                  })
-                }
-              >
-                <FileDown />
-                Export
-              </Button>
-            </div>
+              <EvidenceDrawerToggle />
+              <span className="mx-1 hidden h-6 w-px bg-border lg:block" />
+            </>
+          )}
 
-            <EvidenceDrawerToggle />
-          </div>
-        )}
+          <NotificationsMenu />
+          <ProfileMenu />
+        </div>
       </div>
     </header>
   )

@@ -1,5 +1,6 @@
 import type {
   AppView,
+  CasePriority,
   CaseSummary,
   ComplianceIssue,
   ConfidenceLevel,
@@ -15,11 +16,12 @@ import type {
   TimelineEvent,
   ToolApprovalMode,
   ToolCalled,
+  TransferRequest,
   UploadedForm,
   WorkspaceState,
 } from '@/types'
 import { CUSTOMERS, DEFAULT_CUSTOMER_ID } from '@/data/customers'
-import { CURRENT_ASSOCIATE, seedCases } from '@/data/cases'
+import { CURRENT_ASSOCIATE, seedCases, seedTransfers } from '@/data/cases'
 import { ROLLOVER_GOALS, goalLabel } from '@/data/goals'
 
 export const STEP_ORDER: StepId[] = [
@@ -86,6 +88,10 @@ export type Action =
   | { type: 'REMOVE_UPLOADED_FORM'; id: string }
   | { type: 'SET_RESPONSE_APPROVED'; approved: boolean }
   | { type: 'SET_COMPLIANCE_DOC_APPROVED'; approved: boolean }
+  | { type: 'SET_CASE_PRIORITY'; caseId: string; priority: CasePriority }
+  | { type: 'TRANSFER_CASE'; caseId: string; toAssociate: string; note?: string }
+  | { type: 'ACCEPT_TRANSFER'; requestId: string }
+  | { type: 'DECLINE_TRANSFER'; requestId: string }
 
 function uniquePush<T>(list: T[], item: T, key: (x: T) => string): T[] {
   if (list.some((x) => key(x) === key(item))) return list
@@ -231,9 +237,11 @@ function touchCase(state: WorkspaceState): WorkspaceState {
 // ---------------------------------------------------------------------------
 
 export function createInitialState(): WorkspaceState {
+  const t = now()
   return {
     view: 'home',
-    cases: seedCases(now()),
+    cases: seedCases(t),
+    transferRequests: seedTransfers(t),
     activeCaseId: null,
     toolApprovalMode: 'ask_every_time',
     ...freshWorking(DEFAULT_CUSTOMER_ID),
@@ -272,6 +280,8 @@ export function workspaceReducer(
         customerName: CUSTOMERS[customerId].name,
         goalLabel: 'Not yet selected',
         stage: 'draft',
+        priority: 'medium',
+        assignee: CURRENT_ASSOCIATE,
         currentStep: 'customer_snapshot',
         progressPct: 0,
         lastUpdatedBy: CURRENT_ASSOCIATE,
@@ -507,6 +517,59 @@ export function workspaceReducer(
 
     case 'SET_COMPLIANCE_DOC_APPROVED':
       return { ...state, complianceDocApproved: action.approved }
+
+    case 'SET_CASE_PRIORITY':
+      return {
+        ...state,
+        cases: state.cases.map((c) =>
+          c.id === action.caseId ? { ...c, priority: action.priority } : c,
+        ),
+      }
+
+    case 'TRANSFER_CASE': {
+      const c = state.cases.find((x) => x.id === action.caseId)
+      if (!c) return state
+      const request: TransferRequest = {
+        id: `TR-${Math.floor(1000 + Math.random() * 8999)}`,
+        caseId: c.id,
+        customerName: c.customerName,
+        fromAssociate: CURRENT_ASSOCIATE,
+        toAssociate: action.toAssociate,
+        note: action.note,
+        status: 'pending',
+        createdAt: now(),
+      }
+      return { ...state, transferRequests: [request, ...state.transferRequests] }
+    }
+
+    case 'ACCEPT_TRANSFER': {
+      const req = state.transferRequests.find((r) => r.id === action.requestId)
+      if (!req) return state
+      return {
+        ...state,
+        transferRequests: state.transferRequests.map((r) =>
+          r.id === action.requestId ? { ...r, status: 'accepted' } : r,
+        ),
+        cases: state.cases.map((c) =>
+          c.id === req.caseId
+            ? {
+                ...c,
+                assignee: req.toAssociate,
+                lastUpdatedBy: req.toAssociate,
+                lastUpdatedAt: now(),
+              }
+            : c,
+        ),
+      }
+    }
+
+    case 'DECLINE_TRANSFER':
+      return {
+        ...state,
+        transferRequests: state.transferRequests.map((r) =>
+          r.id === action.requestId ? { ...r, status: 'declined' } : r,
+        ),
+      }
 
     default:
       return state

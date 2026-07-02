@@ -198,6 +198,7 @@ export interface UploadedForm {
 // ---------------------------------------------------------------------------
 
 export type CaseStage = 'draft' | 'in_review' | 'submitted' | 'escalated'
+export type CasePriority = 'high' | 'medium' | 'low'
 
 export interface CaseSummary {
   id: string
@@ -205,10 +206,29 @@ export interface CaseSummary {
   customerName: string
   goalLabel: string
   stage: CaseStage
+  priority: CasePriority
+  assignee: string
   currentStep: StepId
   progressPct: number
   lastUpdatedBy: string
   lastUpdatedAt: number
+  createdAt: number
+}
+
+// ---------------------------------------------------------------------------
+// Case transfers
+// ---------------------------------------------------------------------------
+
+export type TransferStatus = 'pending' | 'accepted' | 'declined'
+
+export interface TransferRequest {
+  id: string
+  caseId: string
+  customerName: string
+  fromAssociate: string
+  toAssociate: string
+  note?: string
+  status: TransferStatus
   createdAt: number
 }
 
@@ -219,6 +239,7 @@ export interface CaseSummary {
 export interface WorkspaceState {
   view: AppView
   cases: CaseSummary[]
+  transferRequests: TransferRequest[]
   activeCaseId: string | null
   activeCustomerId: string
   activeStep: StepId
