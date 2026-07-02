@@ -8,14 +8,14 @@ import {
   Rocket,
   Pause,
   AlertTriangle,
+  RefreshCw,
 } from 'lucide-react'
 import type { Customer } from '@/types'
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { useSimulatedAgentRun } from '@/hooks/useSimulatedAgentRun'
 import { ROLLOVER_GOALS } from '@/data/goals'
 import { StepHeader } from './StepHeader'
-import { StickyActionBar } from '@/components/layout/StickyActionBar'
-import { StepNav } from '@/components/layout/StepNav'
+import { StepConfirm } from './StepConfirm'
 import { CustomerDetailsCard } from '@/components/eligibility/CustomerDetailsCard'
 import { EligibilityResultCard } from '@/components/eligibility/EligibilityResultCard'
 import { RolloverPathCard } from '@/components/eligibility/RolloverPathCard'
@@ -304,22 +304,39 @@ export function GoalEligibilityStep({ customer }: { customer: Customer }) {
       )}
 
       {/* --- Sticky submit bar --- */}
-      <StickyActionBar>
-        <StepNav>
-          <Button
-            variant={hasResult ? 'outline' : 'default'}
-            disabled={!goal || runningAction !== null}
-            onClick={() => run('eligibility')}
-          >
-            {running ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
-            {running
-              ? 'Agent working…'
-              : hasResult
-                ? 'Re-run check'
-                : 'Run Eligibility Check'}
-          </Button>
-        </StepNav>
-      </StickyActionBar>
+      {hasResult && countdown === null && (
+        <StepConfirm
+          tone={clean ? 'success' : 'warn'}
+          icon={clean ? ShieldCheck : AlertTriangle}
+          title={clean ? 'Eligibility confirmed' : 'Eligibility needs your review'}
+          description={
+            clean
+              ? 'All checks passed. Continue to identify the required forms.'
+              : (state.recommendedAction ??
+                'This case can’t proceed as a standard rollover. Review the findings, then continue when ready.')
+          }
+          actions={
+            <>
+              <Button
+                onClick={() =>
+                  dispatch({ type: 'SELECT_STEP', step: 'required_forms' })
+                }
+              >
+                Continue to Required Forms
+                <ArrowRight />
+              </Button>
+              <Button
+                variant="outline"
+                disabled={runningAction !== null}
+                onClick={() => run('eligibility')}
+              >
+                {running ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+                Re-run check
+              </Button>
+            </>
+          }
+        />
+      )}
     </div>
   )
 }

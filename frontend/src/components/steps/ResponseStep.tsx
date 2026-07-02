@@ -4,12 +4,14 @@ import {
   CheckCircle2,
   Circle,
   AlertTriangle,
+  ArrowRight,
+  PenLine,
 } from 'lucide-react'
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { StepHeader } from './StepHeader'
-import { StickyActionBar } from '@/components/layout/StickyActionBar'
-import { StepNav } from '@/components/layout/StepNav'
+import { StepConfirm } from './StepConfirm'
 import { ResponseEditor } from '@/components/response/ResponseEditor'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
@@ -127,18 +129,36 @@ export function ResponseStep() {
         </div>
       )}
 
-      <StickyActionBar>
-        <StepNav
-          nextDisabled={!canContinue}
-          nextHint={
-            !hasDraft
-              ? 'Generate a response first'
+      {hasDraft && (
+        <StepConfirm
+          tone={canContinue ? 'success' : 'info'}
+          icon={canContinue ? CheckCircle2 : PenLine}
+          title={canContinue ? 'Response approved' : 'Review & approve the response'}
+          description={
+            canContinue
+              ? 'You’ve approved the response. Continue to the final review.'
               : docNeeded
-                ? 'Approve the response and report'
-                : 'Approve the response to continue'
+                ? 'Approve the response and the attached compliance report to continue.'
+                : 'Approve the response above to continue to the final review.'
+          }
+          actions={
+            <Button
+              disabled={!canContinue}
+              onClick={() => {
+                dispatch({
+                  type: 'SET_STEP_STATUS',
+                  step: 'response',
+                  status: 'complete',
+                })
+                dispatch({ type: 'SELECT_STEP', step: 'review' })
+              }}
+            >
+              Continue to Review
+              <ArrowRight />
+            </Button>
           }
         />
-      </StickyActionBar>
+      )}
     </div>
   )
 }

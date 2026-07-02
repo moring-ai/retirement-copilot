@@ -4,7 +4,6 @@ import {
   FileSearch,
   Loader2,
   CheckCircle2,
-  ShieldCheck,
   ArrowRight,
   AlertTriangle,
   PartyPopper,
@@ -12,13 +11,11 @@ import {
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { useSimulatedAgentRun } from '@/hooks/useSimulatedAgentRun'
 import { StepHeader } from './StepHeader'
-import { StickyActionBar } from '@/components/layout/StickyActionBar'
-import { StepNav } from '@/components/layout/StepNav'
+import { StepConfirm } from './StepConfirm'
 import { MissingInformationCard } from '@/components/eligibility/MissingInformationCard'
-import { FormUploadCard, reviewComments } from '@/components/forms/FormUploadCard'
+import { FormUploadCard } from '@/components/forms/FormUploadCard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 
 export function RequiredFormsStep() {
   const { state, dispatch } = useWorkspace()
@@ -29,9 +26,6 @@ export function RequiredFormsStep() {
     state.stepStatuses.goal_eligibility === 'complete' ||
     state.stepStatuses.goal_eligibility === 'needs_info'
   const finding = runningAction === 'forms'
-  const canValidate = state.uploadedForms.some(
-    (f) => f.status === 'unverified' || f.status === 'issues',
-  )
 
   const outstanding = state.missingInformation
   const hasIssues = state.uploadedForms.some((f) => f.status === 'issues')
@@ -55,29 +49,28 @@ export function RequiredFormsStep() {
     }
   }, [hasRun])
 
-  const validateAll = () => {
-    state.uploadedForms
-      .filter((f) => f.status === 'unverified' || f.status === 'issues')
-      .forEach((f, i) => {
-        dispatch({ type: 'SET_FORM_STATUS', id: f.id, status: 'verifying' })
-        window.setTimeout(
-          () => {
-            const { status: s, comments } = reviewComments(f.name)
-            dispatch({ type: 'SET_FORM_STATUS', id: f.id, status: s, comments })
-          },
-          900 + i * 400,
-        )
-      })
-  }
-
   return (
     <div className="flex flex-1 flex-col space-y-5">
       <StepHeader
         eyebrow="Guided Case Workspace"
         title="Required Forms"
-        description="Identify the forms this rollover needs, then upload the filled-in versions for an AI completeness check before submission."
+        description="The agent identifies the forms this rollover needs. Upload the filled-in versions for an AI completeness check before submission."
         status={status}
       />
+
+      {finding && (
+        <div className="flex items-center gap-3 rounded-xl border border-secondary/30 bg-accent px-4 py-3 animate-fade-in">
+          <Loader2 className="h-5 w-5 shrink-0 animate-spin text-secondary" />
+          <div>
+            <p className="text-sm font-semibold text-ink">
+              Autopilot — checking required forms…
+            </p>
+            <p className="text-xs text-ink-soft">
+              The agent is matching this case against the approved forms catalog.
+            </p>
+          </div>
+        </div>
+      )}
 
       <Card>
         <CardHeader className="pb-2">
@@ -93,7 +86,7 @@ export function RequiredFormsStep() {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <FileText className="h-4 w-4" />
               {eligibilityDone
-                ? 'Run “Find Required Forms” below to build the checklist.'
+                ? 'Checking the approved forms catalog…'
                 : 'Complete the Goal & Eligibility step first.'}
             </div>
           ) : (
@@ -118,102 +111,64 @@ export function RequiredFormsStep() {
 
       {hasRun && (
         <div ref={doneRef}>
-          <Card
-            className={cn(
-              'border-l-4 animate-fade-in',
-              allClear ? 'border-l-brand' : 'border-l-warn',
-            )}
-          >
-            <CardContent className="p-5">
-              <div className="flex items-start gap-3">
-                <span
-                  className={cn(
-                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-full',
-                    allClear
-                      ? 'bg-brand-soft text-brand-dark'
-                      : 'bg-warn-soft text-warn',
-                  )}
+          <StepConfirm
+            tone={allClear ? 'success' : 'warn'}
+            icon={allClear ? PartyPopper : AlertTriangle}
+            title={
+              allClear
+                ? 'All required forms are ready'
+                : hasIssues
+                  ? 'Some uploaded forms need fixes'
+                  : `${outstanding.length} item${outstanding.length > 1 ? 's' : ''} still outstanding`
+            }
+            description={
+              allClear
+                ? 'Everything the agent flagged for this rollover is accounted for. Ready to move on to the compliance review?'
+                : hasIssues
+                  ? 'The AI review found problems in one or more uploaded forms — see the comments above. You can still continue and resolve them during compliance review.'
+                  : 'The checklist is built. Upload the outstanding documents here, or continue and resolve them later.'
+            }
+            actions={
+              <>
+                <Button
+                  onClick={() =>
+                    dispatch({ type: 'SELECT_STEP', step: 'compliance_review' })
+                  }
                 >
-                  {allClear ? (
-                    <PartyPopper className="h-5 w-5" />
+                  Continue to Compliance Review
+                  <ArrowRight />
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={runningAction !== null}
+                  onClick={() => run('forms')}
+                >
+                  {finding ? (
+                    <Loader2 className="animate-spin" />
                   ) : (
-                    <AlertTriangle className="h-5 w-5" />
+                    <FileSearch />
                   )}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-ink">
-                    {allClear
-                      ? 'All required forms are ready'
-                      : hasIssues
-                        ? 'Some uploaded forms need fixes'
-                        : `${outstanding.length} item${outstanding.length > 1 ? 's' : ''} still outstanding`}
-                  </p>
-                  <p className="mt-1 text-sm text-ink-soft">
-                    {allClear
-                      ? 'Everything the agent flagged for this rollover is accounted for. Ready to move on to the compliance review?'
-                      : hasIssues
-                        ? 'The AI review found problems in one or more uploaded forms — see the comments above. You can still continue and resolve them during compliance review.'
-                        : 'The checklist is built. Upload the outstanding documents here, or continue and resolve them later.'}
-                  </p>
-                  {!allClear && outstanding.length > 0 && (
-                    <ul className="mt-2 space-y-1">
-                      {outstanding.map((item) => (
-                        <li
-                          key={item}
-                          className="flex items-center gap-2 text-sm text-ink-soft"
-                        >
-                          <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-warn" />
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <div className="mt-4">
-                    <Button
-                      onClick={() =>
-                        dispatch({
-                          type: 'SELECT_STEP',
-                          step: 'compliance_review',
-                        })
-                      }
-                    >
-                      Continue to Compliance Review
-                      <ArrowRight />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                  Re-check forms
+                </Button>
+              </>
+            }
+          >
+            {!allClear && outstanding.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {outstanding.map((item) => (
+                  <li
+                    key={item}
+                    className="flex items-center gap-2 text-sm text-ink-soft"
+                  >
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-warn" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </StepConfirm>
         </div>
       )}
-
-      <StickyActionBar>
-        <StepNav>
-          <Button
-            variant={hasRun ? 'outline' : 'default'}
-            disabled={runningAction !== null || !eligibilityDone}
-            onClick={() => run('forms')}
-          >
-            {finding ? <Loader2 className="animate-spin" /> : <FileSearch />}
-            {finding
-              ? 'Agent working…'
-              : hasRun
-                ? 'Re-find Forms'
-                : 'Find Required Forms'}
-          </Button>
-          {hasRun && (
-            <Button
-              variant="outline"
-              disabled={!canValidate}
-              onClick={validateAll}
-            >
-              <ShieldCheck />
-              Validate Required Forms
-            </Button>
-          )}
-        </StepNav>
-      </StickyActionBar>
     </div>
   )
 }

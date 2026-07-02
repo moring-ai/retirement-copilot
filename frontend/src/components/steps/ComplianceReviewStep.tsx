@@ -13,6 +13,7 @@ import {
   ArrowRight,
   Rocket,
   Pause,
+  RefreshCw,
   type LucideIcon,
 } from 'lucide-react'
 import type {
@@ -25,8 +26,7 @@ import { useSimulatedAgentRun } from '@/hooks/useSimulatedAgentRun'
 import { CUSTOMERS } from '@/data/customers'
 import { goalLabel } from '@/data/goals'
 import { StepHeader } from './StepHeader'
-import { StickyActionBar } from '@/components/layout/StickyActionBar'
-import { StepNav } from '@/components/layout/StepNav'
+import { StepConfirm } from './StepConfirm'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -126,27 +126,39 @@ export function ComplianceReviewStep() {
     }
   }, [formsDone, hasRun, runningAction, run])
 
-  // Once resolved (and any write action approved), route the case if needed and
-  // advance to Response.
+  // Cleared → count down and advance to Response automatically.
   useEffect(() => {
     if (
       autoRan.current &&
       !paused &&
       hasRun &&
+      !escalation &&
       pendingTools.length === 0 &&
       countdown === null
     ) {
-      if (escalation && primaryIssue && !routedRef.current) {
-        routedRef.current = true
-        toast({
-          variant: 'info',
-          title: `Routed — ${RECOMMENDATION[primaryIssue.recommendation].label}`,
-          description: primaryIssue.recommendationDetail,
-        })
-      }
       setCountdown(10)
     }
-  }, [hasRun, pendingTools.length, paused, countdown, escalation, primaryIssue])
+  }, [hasRun, escalation, pendingTools.length, paused, countdown])
+
+  // Escalation → apply the recommended routing once; the associate then
+  // acknowledges before continuing (no auto-advance).
+  useEffect(() => {
+    if (
+      autoRan.current &&
+      hasRun &&
+      escalation &&
+      pendingTools.length === 0 &&
+      primaryIssue &&
+      !routedRef.current
+    ) {
+      routedRef.current = true
+      toast({
+        variant: 'info',
+        title: `Routed — ${RECOMMENDATION[primaryIssue.recommendation].label}`,
+        description: primaryIssue.recommendationDetail,
+      })
+    }
+  }, [hasRun, escalation, pendingTools.length, primaryIssue])
 
   useEffect(() => {
     if (countdown === null) return
@@ -360,35 +372,54 @@ export function ComplianceReviewStep() {
             <ScrollText className="h-6 w-6 text-muted-foreground" />
             <p className="max-w-sm text-sm text-muted-foreground">
               {formsDone
-                ? 'Run the compliance check below to surface any blockers and recommendations.'
+                ? 'Reviewing the case against compliance and escalation policy…'
                 : 'Complete the Required Forms step first.'}
             </p>
           </CardContent>
         </Card>
       )}
 
-      <StickyActionBar>
-        <StepNav>
-          {hasRun && (
-            <Button variant="outline" onClick={downloadReport}>
-              <Download />
-              Download Report
-            </Button>
-          )}
-          <Button
-            variant={hasRun ? 'outline' : 'default'}
-            disabled={runningAction !== null || !formsDone}
-            onClick={() => run('compliance')}
-          >
-            {running ? <Loader2 className="animate-spin" /> : <ScrollText />}
-            {running
-              ? 'Agent working…'
-              : hasRun
-                ? 'Re-run check'
-                : 'Check Compliance'}
-          </Button>
-        </StepNav>
-      </StickyActionBar>
+      {hasRun && countdown === null && (
+        <StepConfirm
+          tone={escalation ? 'warn' : 'success'}
+          icon={escalation ? AlertTriangle : ShieldCheck}
+          title={
+            escalation
+              ? `Escalation — ${primaryIssue ? RECOMMENDATION[primaryIssue.recommendation].label : 'specialist review'}`
+              : 'Compliance cleared'
+          }
+          description={
+            escalation
+              ? (primaryIssue?.recommendationDetail ??
+                'Review the recommendations above before continuing.')
+              : 'No compliance blockers. Continue to draft the customer response.'
+          }
+          actions={
+            <>
+              <Button
+                onClick={() =>
+                  dispatch({ type: 'SELECT_STEP', step: 'response' })
+                }
+              >
+                {escalation ? 'Acknowledge & Continue' : 'Continue to Response'}
+                <ArrowRight />
+              </Button>
+              <Button variant="outline" onClick={downloadReport}>
+                <Download />
+                Download Report
+              </Button>
+              <Button
+                variant="outline"
+                disabled={runningAction !== null}
+                onClick={() => run('compliance')}
+              >
+                {running ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+                Re-run
+              </Button>
+            </>
+          }
+        />
+      )}
     </div>
   )
 }
