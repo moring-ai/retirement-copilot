@@ -113,23 +113,28 @@ export function ComplianceReviewStep() {
   const primaryIssue = issues.find((i) => i.recommendation !== 'proceed') ?? issues[0]
 
   // ---- Autopilot ----
-  const autoRan = useRef(false)
+  const sawRun = useRef(false)
   const routedRef = useRef(false)
   const [countdown, setCountdown] = useState<number | null>(null)
   const [paused, setPaused] = useState(false)
 
-  // Entering the step auto-runs the compliance review.
+  // Entering the step auto-runs the compliance review. Guarded on state (not a
+  // ref) so StrictMode's mount/cleanup/remount can't cancel it permanently.
   useEffect(() => {
-    if (formsDone && !hasRun && !runningAction && !autoRan.current) {
-      autoRan.current = true
+    if (formsDone && !hasRun && runningAction === null) {
       run('compliance')
     }
   }, [formsDone, hasRun, runningAction, run])
 
+  // Only auto-advance / route after a live run this mount.
+  useEffect(() => {
+    if (running) sawRun.current = true
+  }, [running])
+
   // Cleared → count down and advance to Response automatically.
   useEffect(() => {
     if (
-      autoRan.current &&
+      sawRun.current &&
       !paused &&
       hasRun &&
       !escalation &&
@@ -144,7 +149,7 @@ export function ComplianceReviewStep() {
   // acknowledges before continuing (no auto-advance).
   useEffect(() => {
     if (
-      autoRan.current &&
+      sawRun.current &&
       hasRun &&
       escalation &&
       pendingTools.length === 0 &&

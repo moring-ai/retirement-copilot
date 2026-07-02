@@ -59,7 +59,7 @@ export function GoalEligibilityStep({ customer }: { customer: Customer }) {
 
   // ---- Autopilot: agent drives, associate watches / intervenes ----
   const resultsRef = useRef<HTMLDivElement>(null)
-  const autoRan = useRef(false)
+  const sawRun = useRef(false)
   const [countdown, setCountdown] = useState<number | null>(null)
   const [paused, setPaused] = useState(false)
 
@@ -68,18 +68,23 @@ export function GoalEligibilityStep({ customer }: { customer: Customer }) {
     !escalation &&
     pendingTools.length === 0
 
-  // Selecting a goal auto-starts the eligibility check.
+  // Selecting a goal auto-starts the eligibility check. Guarded on state (not a
+  // ref) so StrictMode's mount/cleanup/remount can't cancel it permanently.
   useEffect(() => {
     if (
       state.selectedGoalId &&
       !state.eligibilityResult &&
-      !state.runningAction &&
-      !autoRan.current
+      state.runningAction === null
     ) {
-      autoRan.current = true
       run('eligibility')
     }
   }, [state.selectedGoalId, state.eligibilityResult, state.runningAction, run])
+
+  // Remember that a run actually happened this mount, so autopilot only
+  // auto-advances after a live run — not when re-opening a completed step.
+  useEffect(() => {
+    if (running) sawRun.current = true
+  }, [running])
 
   // Bring the results into view while the agent works.
   useEffect(() => {
@@ -90,7 +95,7 @@ export function GoalEligibilityStep({ customer }: { customer: Customer }) {
 
   // Once every check passes, count down and advance to Required Forms.
   useEffect(() => {
-    if (autoRan.current && !paused && clean && countdown === null) {
+    if (sawRun.current && !paused && clean && countdown === null) {
       setCountdown(10)
     }
   }, [clean, paused, countdown])

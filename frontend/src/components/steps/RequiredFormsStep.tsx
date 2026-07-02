@@ -33,12 +33,12 @@ export function RequiredFormsStep() {
 
   // Autopilot: entering this step auto-runs the required-forms check, then
   // waits for the associate to review and continue (no auto-advance).
-  const autoRan = useRef(false)
+  // Guarded on state (not a ref) so it survives StrictMode's mount/cleanup/
+  // remount — otherwise the scheduled run gets cancelled and never retried.
   const doneRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (eligibilityDone && !hasRun && !runningAction && !autoRan.current) {
-      autoRan.current = true
+    if (eligibilityDone && !hasRun && runningAction === null) {
       run('forms')
     }
   }, [eligibilityDone, hasRun, runningAction, run])
