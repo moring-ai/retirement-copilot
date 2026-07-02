@@ -173,7 +173,7 @@ def pb_checklist(state: "dict") -> dict:
     )
     text, mode = llm_client.prompt_chain_step(_CHECKLIST_SYSTEM, user, fallback_json)
     try:
-        parsed = json.loads(text)
+        parsed = llm_client.loads_lenient(text)
         next_steps = parsed.get("next_steps") or _FALLBACK_NEXT_STEPS
         required_forms = parsed.get("required_forms") or _FALLBACK_FORMS
     except json.JSONDecodeError:
