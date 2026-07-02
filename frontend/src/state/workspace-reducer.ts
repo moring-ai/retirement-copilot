@@ -243,7 +243,7 @@ export function createInitialState(): WorkspaceState {
     cases: seedCases(t),
     transferRequests: seedTransfers(t),
     activeCaseId: null,
-    toolApprovalMode: 'ask_every_time',
+    toolApprovalMode: 'full_control',
     ...freshWorking(DEFAULT_CUSTOMER_ID),
   }
 }
