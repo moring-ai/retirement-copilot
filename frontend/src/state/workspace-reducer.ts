@@ -1,4 +1,5 @@
 import type {
+  ComplianceOutcome,
   ConfidenceLevel,
   EligibilityResult,
   Finding,
@@ -51,6 +52,7 @@ export type Action =
   | { type: 'SET_REQUIRED_FORMS'; forms: string[] }
   | { type: 'SET_MISSING_INFO'; items: string[] }
   | { type: 'SET_RECOMMENDED_ACTION'; text: string }
+  | { type: 'SET_COMPLIANCE_OUTCOME'; outcome: ComplianceOutcome }
   | { type: 'SET_DRAFT_TEXT'; text: string }
   | { type: 'TOGGLE_REVIEW_ITEM'; id: string }
   | { type: 'RESET_DEMO' }
@@ -91,6 +93,7 @@ export function createInitialState(
     requiredForms: [],
     missingInformation: [],
     recommendedAction: null,
+    complianceOutcome: null,
     draftText: '',
     reviewQueue: [
       {
@@ -226,6 +229,9 @@ export function workspaceReducer(
 
     case 'SET_RECOMMENDED_ACTION':
       return { ...state, recommendedAction: action.text }
+
+    case 'SET_COMPLIANCE_OUTCOME':
+      return { ...state, complianceOutcome: action.outcome }
 
     case 'SET_DRAFT_TEXT':
       return { ...state, draftText: action.text }

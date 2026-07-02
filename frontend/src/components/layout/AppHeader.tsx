@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { toast } from '@/components/ui/use-toast'
 import { EvidenceDrawerToggle } from './EvidenceDrawerToggle'
 import { CaseMenuToggle } from './CaseMenuToggle'
+import { CaseSwitcher } from './CaseSwitcher'
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { CUSTOMERS } from '@/data/customers'
 
@@ -34,17 +35,11 @@ export function AppHeader() {
         </div>
 
         <div className="ml-auto flex items-center gap-2 lg:gap-3">
-          <div className="hidden items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 md:flex">
-            <span className="text-xs text-muted-foreground">Case</span>
-            <span className="text-xs font-semibold text-ink">
-              {customer.customer_id}
-            </span>
-            <span className="h-3 w-px bg-border" />
-            <Badge variant="warn">
-              <Clock3 className="h-3 w-3" />
-              In Review
-            </Badge>
-          </div>
+          <CaseSwitcher />
+          <Badge variant="warn" className="hidden md:inline-flex">
+            <Clock3 className="h-3 w-3" />
+            In Review
+          </Badge>
 
           <div className="hidden items-center gap-2 lg:flex">
             <Button

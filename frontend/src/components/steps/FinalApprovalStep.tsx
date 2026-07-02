@@ -11,10 +11,14 @@ export function FinalApprovalStep() {
   const { state } = useWorkspace()
   const reviewDone = state.reviewQueue.filter((i) => i.checked).length
   const reviewTotal = state.reviewQueue.length
-  const allStepsClear = STEP_ORDER.filter((s) => s !== 'final_approval').every(
-    (s) => state.stepStatuses[s] === 'complete',
+  // Every earlier step has been worked through (not still pending / running).
+  // "Needs Info" counts as addressed — the associate is aware of it.
+  const workedThrough = STEP_ORDER.filter((s) => s !== 'final_approval').every(
+    (s) =>
+      state.stepStatuses[s] === 'complete' ||
+      state.stepStatuses[s] === 'needs_info',
   )
-  const readyToSubmit = reviewDone === reviewTotal && allStepsClear
+  const readyToSubmit = reviewDone === reviewTotal && workedThrough
 
   return (
     <div className="space-y-5">
@@ -88,7 +92,7 @@ export function FinalApprovalStep() {
               </p>
               <p className="text-xs text-muted-foreground">
                 {reviewDone}/{reviewTotal} review items done ·{' '}
-                {allStepsClear ? 'all steps complete' : 'steps outstanding'}
+                {workedThrough ? 'all steps addressed' : 'steps outstanding'}
               </p>
             </div>
           </div>

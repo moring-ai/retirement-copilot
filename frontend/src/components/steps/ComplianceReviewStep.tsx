@@ -4,6 +4,7 @@ import {
   ShieldCheck,
   AlertTriangle,
   CheckCircle2,
+  Clock,
 } from 'lucide-react'
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { useSimulatedAgentRun } from '@/hooks/useSimulatedAgentRun'
@@ -26,8 +27,33 @@ export function ComplianceReviewStep() {
   const formsDone =
     state.stepStatuses.required_forms === 'complete' ||
     state.stepStatuses.required_forms === 'needs_info'
-  const escalation = status === 'needs_info'
+  const outcome = state.complianceOutcome
   const warnings = state.evidence.complianceWarnings
+
+  const banner = {
+    cleared: {
+      accent: 'border-l-brand',
+      chip: 'bg-brand-soft text-brand-dark',
+      icon: ShieldCheck,
+      title: 'No compliance blockers — cleared for draft response',
+      body: 'Identity verified, no restrictions, and rollover permitted. The agent may draft a compliant customer response.',
+    },
+    caution: {
+      accent: 'border-l-warn',
+      chip: 'bg-warn-soft text-warn',
+      icon: Clock,
+      title: 'Cleared with caution — time-sensitive',
+      body: 'The rollover can proceed, but it is time-sensitive (60-day window) and withholding applies. Move promptly and defer tax questions to a professional.',
+    },
+    escalation: {
+      accent: 'border-l-danger',
+      chip: 'bg-danger-soft text-danger',
+      icon: AlertTriangle,
+      title: 'Escalation required',
+      body: 'System data triggered an escalation. Do not proceed as a standard rollover; route to a specialist.',
+    },
+  }[outcome ?? 'cleared']
+  const BannerIcon = banner.icon
 
   return (
     <div className="space-y-5">
@@ -51,39 +77,17 @@ export function ComplianceReviewStep() {
         </Button>
       </StepHeader>
 
-      {hasRun && (
-        <Card
-          className={
-            escalation
-              ? 'border-l-4 border-l-warn'
-              : 'border-l-4 border-l-brand'
-          }
-        >
+      {hasRun && outcome && (
+        <Card className={`border-l-4 ${banner.accent}`}>
           <CardContent className="flex items-start gap-3 p-5">
             <span
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                escalation
-                  ? 'bg-warn-soft text-warn'
-                  : 'bg-brand-soft text-brand-dark'
-              }`}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${banner.chip}`}
             >
-              {escalation ? (
-                <AlertTriangle className="h-5 w-5" />
-              ) : (
-                <ShieldCheck className="h-5 w-5" />
-              )}
+              <BannerIcon className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-sm font-semibold text-ink">
-                {escalation
-                  ? 'Escalation required'
-                  : 'No compliance blockers — cleared for draft response'}
-              </p>
-              <p className="mt-1 text-sm text-ink-soft">
-                {escalation
-                  ? 'System data triggered an escalation. Do not proceed as a standard rollover; route to a specialist.'
-                  : 'Identity verified, no restrictions, and rollover permitted. The agent may draft a compliant customer response.'}
-              </p>
+              <p className="text-sm font-semibold text-ink">{banner.title}</p>
+              <p className="mt-1 text-sm text-ink-soft">{banner.body}</p>
             </div>
           </CardContent>
         </Card>

@@ -11,6 +11,19 @@
 export type ToolStatus = 'ok' | 'error'
 export type ConfidenceLevel = 'High' | 'Medium' | 'Low'
 
+/** The four demo archetypes, each producing distinctly different agent output. */
+export type CaseType =
+  | 'clean_new_ira'
+  | 'clean_existing_ira'
+  | 'indirect_caution'
+  | 'escalation'
+
+/** How a scenario reads at a glance in the case switcher. */
+export type ScenarioTone = 'positive' | 'caution' | 'critical'
+
+/** Result of the compliance review, independent of step status. */
+export type ComplianceOutcome = 'cleared' | 'caution' | 'escalation'
+
 /** Case step statuses, styled distinctly in the sidebar. */
 export type StepStatus = 'complete' | 'in_progress' | 'needs_info' | 'pending'
 
@@ -84,6 +97,12 @@ export interface Customer {
   account_restrictions: string[]
   documents: CustomerDocuments
   case_status: CaseStatus
+  /** Whether the customer has already taken a distribution (indirect rollover). */
+  distribution_status: 'none' | 'indirect_in_progress'
+  // Demo scenario metadata (drives the agent output branch + case switcher).
+  caseType: CaseType
+  scenarioLabel: string
+  scenarioTone: ScenarioTone
 }
 
 // ---------------------------------------------------------------------------
@@ -159,6 +178,7 @@ export interface WorkspaceState {
   requiredForms: string[]
   missingInformation: string[]
   recommendedAction: string | null
+  complianceOutcome: ComplianceOutcome | null
   draftText: string
   reviewQueue: ReviewQueueItem[]
 }
