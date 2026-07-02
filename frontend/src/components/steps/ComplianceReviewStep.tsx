@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import {
   ScrollText,
   Loader2,
@@ -9,6 +10,9 @@ import {
   Ban,
   UserCog,
   ArrowUpRight,
+  ArrowRight,
+  Rocket,
+  Pause,
   type LucideIcon,
 } from 'lucide-react'
 import type {
@@ -90,7 +94,7 @@ const SEVERITY_RANK: Record<IssueSeverity, number> = {
 }
 
 export function ComplianceReviewStep() {
-  const { state } = useWorkspace()
+  const { state, dispatch } = useWorkspace()
   const { run, runningAction } = useSimulatedAgentRun()
   const status = state.stepStatuses.compliance_review
   const hasRun = status === 'complete' || status === 'needs_info'
@@ -103,6 +107,64 @@ export function ComplianceReviewStep() {
   const issues = [...state.complianceIssues].sort(
     (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity],
   )
+  const pendingTools = state.evidence.toolCalls.filter(
+    (t) => t.approval === 'pending',
+  )
+  const primaryIssue = issues.find((i) => i.recommendation !== 'proceed') ?? issues[0]
+
+  // ---- Autopilot ----
+  const autoRan = useRef(false)
+  const routedRef = useRef(false)
+  const [countdown, setCountdown] = useState<number | null>(null)
+  const [paused, setPaused] = useState(false)
+
+  // Entering the step auto-runs the compliance review.
+  useEffect(() => {
+    if (formsDone && !hasRun && !runningAction && !autoRan.current) {
+      autoRan.current = true
+      run('compliance')
+    }
+  }, [formsDone, hasRun, runningAction, run])
+
+  // Once resolved (and any write action approved), route the case if needed and
+  // advance to Response.
+  useEffect(() => {
+    if (
+      autoRan.current &&
+      !paused &&
+      hasRun &&
+      pendingTools.length === 0 &&
+      countdown === null
+    ) {
+      if (escalation && primaryIssue && !routedRef.current) {
+        routedRef.current = true
+        toast({
+          variant: 'info',
+          title: `Routed — ${RECOMMENDATION[primaryIssue.recommendation].label}`,
+          description: primaryIssue.recommendationDetail,
+        })
+      }
+      setCountdown(10)
+    }
+  }, [hasRun, pendingTools.length, paused, countdown, escalation, primaryIssue])
+
+  useEffect(() => {
+    if (countdown === null) return
+    if (countdown <= 0) {
+      dispatch({ type: 'SELECT_STEP', step: 'response' })
+      return
+    }
+    const t = window.setTimeout(
+      () => setCountdown((c) => (c === null ? null : c - 1)),
+      1000,
+    )
+    return () => window.clearTimeout(t)
+  }, [countdown, dispatch])
+
+  const cancelAutopilot = () => {
+    setPaused(true)
+    setCountdown(null)
+  }
 
   const downloadReport = () => {
     const customer = CUSTOMERS[state.activeCustomerId]
@@ -176,6 +238,70 @@ export function ComplianceReviewStep() {
           </PopoverContent>
         </Popover>
       </StepHeader>
+
+      {/* Autopilot status */}
+      {countdown !== null ? (
+        <div
+          className={cn(
+            'flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 animate-fade-in',
+            escalation
+              ? 'border-warn/30 bg-warn-soft'
+              : 'border-brand/30 bg-brand-soft',
+          )}
+        >
+          <Rocket
+            className={cn(
+              'h-5 w-5 shrink-0',
+              escalation ? 'text-warn' : 'text-brand-dark',
+            )}
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-ink">
+              {escalation
+                ? `Routed — ${primaryIssue ? RECOMMENDATION[primaryIssue.recommendation].label : 'Specialist review'}`
+                : 'Compliance cleared — autopilot engaged'}
+            </p>
+            <p className="text-xs text-ink-soft">
+              {escalation ? 'The recommended routing was applied. ' : ''}Moving to
+              Response in{' '}
+              <span className="font-semibold tabular-nums">{countdown}s</span>.
+              Stay to review, or jump ahead.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={cancelAutopilot}>
+            <Pause />
+            Stay
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => dispatch({ type: 'SELECT_STEP', step: 'response' })}
+          >
+            Go now
+            <ArrowRight />
+          </Button>
+        </div>
+      ) : running ? (
+        <div className="flex items-center gap-3 rounded-xl border border-secondary/30 bg-accent px-4 py-3 animate-fade-in">
+          <Loader2 className="h-5 w-5 shrink-0 animate-spin text-secondary" />
+          <div>
+            <p className="text-sm font-semibold text-ink">
+              Autopilot — running the compliance review…
+            </p>
+            <p className="text-xs text-ink-soft">
+              The agent is checking approved language and escalation policy.
+              You’re watching.
+            </p>
+          </div>
+        </div>
+      ) : hasRun && pendingTools.length > 0 ? (
+        <div className="flex items-start gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 animate-fade-in">
+          <Pause className="mt-0.5 h-5 w-5 shrink-0 text-warn" />
+          <p className="text-sm text-ink-soft">
+            <span className="font-semibold text-ink">Autopilot paused</span> —
+            approve the pending action in the Agent Evidence panel to continue.
+          </p>
+        </div>
+      ) : null}
 
       {hasRun && (
         <Card
