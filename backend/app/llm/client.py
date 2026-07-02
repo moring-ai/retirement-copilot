@@ -11,9 +11,31 @@ Output dict schema (consumed by the graph + guardrails):
 from __future__ import annotations
 
 import json
+import re
 
 from app.config import settings
 from app.guardrails.checks import determine_escalation
+
+_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
+
+
+def loads_lenient(text: str) -> dict:
+    """Parse a JSON object from a model response.
+
+    Tolerates markdown ```json fences and leading/trailing prose by extracting
+    the outermost {...}. Raises json.JSONDecodeError if nothing parses — callers
+    fall back to deterministic synthesis. This replaces reliance on the OpenAI
+    ``response_format={"type":"json_object"}`` flag, which the AICP gateway
+    (LiteLLM -> Anthropic) does not honor (it returns an empty object).
+    """
+    s = _FENCE_RE.sub("", text.strip())
+    try:
+        return json.loads(s)
+    except json.JSONDecodeError:
+        start, end = s.find("{"), s.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            return json.loads(s[start:end + 1])
+        raise
 
 SYSTEM_PROMPT = (
     "You are an internal servicing copilot for Fidelity associates handling "
@@ -199,6 +221,31 @@ def _make_client():
     return OpenAI(**kwargs)
 
 
+def _trace_meta(step: str) -> dict:
+    """Extra request fields so calls are attributable in the AICP AI gateway.
+
+    Only meaningful when pointed at the LiteLLM gateway (which reads
+    ``metadata``); harmless when talking straight to OpenAI.
+    """
+    agent = settings.agent_name
+    teams = [t.strip() for t in settings.agent_teams.split(",") if t.strip()]
+    tags = [f"agent:{agent}", "app:retirement-copilot", "runtime:agentcore"] + [
+        f"team:{t}" for t in teams
+    ]
+    return {
+        "user": f"agent:{agent}",
+        "extra_body": {
+            "metadata": {
+                "trace_user_id": f"agent:{agent}",
+                "trace_name": f"agent-{agent}",
+                "generation_name": f"agent-{agent}-{step}",
+                "tags": tags,
+                "agent": agent,
+            }
+        },
+    }
+
+
 def _openai_synthesize(
     message: str, rag_chunks: list[dict], tool_results: dict, escalation_reasons: list[str]
 ) -> dict:
@@ -212,15 +259,15 @@ def _openai_synthesize(
     resp = client.chat.completions.create(
         model=settings.agent_model,
         max_tokens=1500,
-        response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
         ],
+        **_trace_meta("synthesize"),
     )
     text = (resp.choices[0].message.content or "").strip()
     try:
-        data = json.loads(text)
+        data = loads_lenient(text)
     except json.JSONDecodeError:
         # Fall back gracefully rather than failing the request.
         data = _deterministic_synthesize(message, rag_chunks, tool_results, escalation_reasons)
@@ -267,6 +314,7 @@ def prompt_chain_step(system: str, user: str, fallback_text: str) -> tuple[str, 
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
+            **_trace_meta("prompt-chain"),
         )
         text = (resp.choices[0].message.content or "").strip()
         return (text or fallback_text), ("live" if text else "fallback")

@@ -1,0 +1,12 @@
+# AgentCore packaging of the retirement copilot. No psycopg/pgvector: the
+# container uses the in-process memory vector store (RAG_BACKEND=memory) and no
+# sentence-transformers, so RAG falls back to the deterministic hashed embedding.
+fastapi>=0.115,<0.116
+uvicorn[standard]>=0.34,<0.35
+pydantic>=2.9,<3
+pydantic-settings>=2.5,<3
+langgraph>=0.2.40,<0.3
+langchain-core>=0.3,<0.4
+openai>=1.59,<2
+mcp>=1.9,<2
+httpx>=0.27,<0.29
