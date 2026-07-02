@@ -1,7 +1,7 @@
 import type { CaseSummary } from '@/types'
 
 /** The signed-in associate. Stamped onto every edit as "last updated by". */
-export const CURRENT_ASSOCIATE = 'Sanjay K.'
+export const CURRENT_ASSOCIATE = 'Masato Otsu'
 
 const MIN = 60_000
 const HOUR = 60 * MIN
