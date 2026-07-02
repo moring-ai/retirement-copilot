@@ -1,10 +1,13 @@
+import { useEffect, useRef, useState } from 'react'
 import {
   Target,
   ArrowRight,
   ChevronDown,
   ShieldCheck,
   Loader2,
-  Info,
+  Rocket,
+  Pause,
+  AlertTriangle,
 } from 'lucide-react'
 import type { Customer } from '@/types'
 import { useWorkspace } from '@/state/WorkspaceContext'
@@ -52,6 +55,63 @@ export function GoalEligibilityStep({ customer }: { customer: Customer }) {
   const pendingTools = state.evidence.toolCalls.filter(
     (t) => t.approval === 'pending',
   )
+  const escalation = status === 'needs_info'
+
+  // ---- Autopilot: agent drives, associate watches / intervenes ----
+  const resultsRef = useRef<HTMLDivElement>(null)
+  const autoRan = useRef(false)
+  const [countdown, setCountdown] = useState<number | null>(null)
+  const [paused, setPaused] = useState(false)
+
+  const clean =
+    Boolean(state.eligibilityResult?.eligible) &&
+    !escalation &&
+    pendingTools.length === 0
+
+  // Selecting a goal auto-starts the eligibility check.
+  useEffect(() => {
+    if (
+      state.selectedGoalId &&
+      !state.eligibilityResult &&
+      !state.runningAction &&
+      !autoRan.current
+    ) {
+      autoRan.current = true
+      run('eligibility')
+    }
+  }, [state.selectedGoalId, state.eligibilityResult, state.runningAction, run])
+
+  // Bring the results into view while the agent works.
+  useEffect(() => {
+    if (running || state.eligibilityResult) {
+      resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [running, state.eligibilityResult])
+
+  // Once every check passes, count down and advance to Required Forms.
+  useEffect(() => {
+    if (autoRan.current && !paused && clean && countdown === null) {
+      setCountdown(10)
+    }
+  }, [clean, paused, countdown])
+
+  useEffect(() => {
+    if (countdown === null) return
+    if (countdown <= 0) {
+      dispatch({ type: 'SELECT_STEP', step: 'required_forms' })
+      return
+    }
+    const t = window.setTimeout(
+      () => setCountdown((c) => (c === null ? null : c - 1)),
+      1000,
+    )
+    return () => window.clearTimeout(t)
+  }, [countdown, dispatch])
+
+  const cancelAutopilot = () => {
+    setPaused(true)
+    setCountdown(null)
+  }
 
   return (
     <div className="flex flex-1 flex-col space-y-5">
@@ -146,42 +206,96 @@ export function GoalEligibilityStep({ customer }: { customer: Customer }) {
 
       <CustomerDetailsCard customer={customer} />
 
-      {pendingTools.length > 0 && (
-        <div className="flex items-start gap-2.5 rounded-lg border border-warn/30 bg-warn-soft px-4 py-3 animate-fade-in">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-warn" />
+      {/* Autopilot status */}
+      {countdown !== null ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-brand/30 bg-brand-soft px-4 py-3 animate-fade-in">
+          <Rocket className="h-5 w-5 shrink-0 text-brand-dark" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-ink">
+              All checks passed — autopilot engaged
+            </p>
+            <p className="text-xs text-ink-soft">
+              Moving to Required Forms in{' '}
+              <span className="font-semibold tabular-nums text-brand-dark">
+                {countdown}s
+              </span>
+              . Stay to review, or jump ahead.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={cancelAutopilot}>
+            <Pause />
+            Stay
+          </Button>
+          <Button
+            size="sm"
+            onClick={() =>
+              dispatch({ type: 'SELECT_STEP', step: 'required_forms' })
+            }
+          >
+            Go now
+            <ArrowRight />
+          </Button>
+        </div>
+      ) : running ? (
+        <div className="flex items-center gap-3 rounded-xl border border-secondary/30 bg-accent px-4 py-3 animate-fade-in">
+          <Loader2 className="h-5 w-5 shrink-0 animate-spin text-secondary" />
+          <div>
+            <p className="text-sm font-semibold text-ink">
+              Autopilot — running the eligibility check…
+            </p>
+            <p className="text-xs text-ink-soft">
+              The agent is gathering data and checking policy. You’re watching.
+            </p>
+          </div>
+        </div>
+      ) : hasResult && pendingTools.length > 0 ? (
+        <div className="flex items-start gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 animate-fade-in">
+          <Pause className="mt-0.5 h-5 w-5 shrink-0 text-warn" />
           <p className="text-sm text-ink-soft">
-            <span className="font-semibold text-ink">
-              {pendingTools.length} tool call{pendingTools.length > 1 ? 's' : ''} await your approval
-            </span>{' '}
-            in the Agent Evidence panel. Approve them to let the agent use the
-            data, or switch to “Full control”.
+            <span className="font-semibold text-ink">Autopilot paused</span> —
+            approve the {pendingTools.length} pending tool call
+            {pendingTools.length > 1 ? 's' : ''} in the Agent Evidence panel to
+            continue, or switch to “Full control”.
           </p>
         </div>
-      )}
+      ) : hasResult && escalation ? (
+        <div className="flex items-start gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 animate-fade-in">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warn" />
+          <p className="text-sm text-ink-soft">
+            <span className="font-semibold text-ink">
+              Autopilot paused — needs your review.
+            </span>{' '}
+            This case can’t proceed automatically. Review the findings and
+            recommendations before continuing.
+          </p>
+        </div>
+      ) : null}
 
-      {running && !hasResult ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <ResultSkeleton />
-          <ResultSkeleton />
-        </div>
-      ) : hasResult ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 animate-fade-in">
-          <EligibilityResultCard result={state.eligibilityResult} />
-          <RolloverPathCard path={state.rolloverPath} />
-          <RecommendedActionCard text={state.recommendedAction} />
-        </div>
-      ) : (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-2 px-6 py-10 text-center">
-            <ShieldCheck className="h-6 w-6 text-muted-foreground" />
-            <p className="max-w-sm text-sm text-muted-foreground">
-              {goal
-                ? 'Run the eligibility check below to confirm whether this rollover can proceed.'
-                : 'Select a rollover goal above, then run the eligibility check.'}
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      <div ref={resultsRef} className="scroll-mt-36">
+        {running && !hasResult ? (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <ResultSkeleton />
+            <ResultSkeleton />
+          </div>
+        ) : hasResult ? (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 animate-fade-in">
+            <EligibilityResultCard result={state.eligibilityResult} />
+            <RolloverPathCard path={state.rolloverPath} />
+            <RecommendedActionCard text={state.recommendedAction} />
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="flex flex-col items-center gap-2 px-6 py-10 text-center">
+              <ShieldCheck className="h-6 w-6 text-muted-foreground" />
+              <p className="max-w-sm text-sm text-muted-foreground">
+                {goal
+                  ? 'Running the eligibility check…'
+                  : 'Select a rollover goal above — the eligibility check starts automatically.'}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {state.findings.length > 0 && (
         <div className="animate-fade-in">
