@@ -1,12 +1,11 @@
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { CUSTOMERS } from '@/data/customers'
 import { CustomerSnapshotStep } from './CustomerSnapshotStep'
-import { RolloverGoalStep } from './RolloverGoalStep'
-import { EligibilityCheckStep } from './EligibilityCheckStep'
+import { GoalEligibilityStep } from './GoalEligibilityStep'
 import { RequiredFormsStep } from './RequiredFormsStep'
 import { ComplianceReviewStep } from './ComplianceReviewStep'
-import { DraftResponseStep } from './DraftResponseStep'
-import { FinalApprovalStep } from './FinalApprovalStep'
+import { ResponseStep } from './ResponseStep'
+import { ReviewStep } from './ReviewStep'
 
 export function StepPanel() {
   const { state } = useWorkspace()
@@ -15,18 +14,16 @@ export function StepPanel() {
   switch (state.activeStep) {
     case 'customer_snapshot':
       return <CustomerSnapshotStep customer={customer} />
-    case 'rollover_goal':
-      return <RolloverGoalStep customer={customer} />
-    case 'eligibility_check':
-      return <EligibilityCheckStep customer={customer} />
+    case 'goal_eligibility':
+      return <GoalEligibilityStep customer={customer} />
     case 'required_forms':
       return <RequiredFormsStep />
     case 'compliance_review':
       return <ComplianceReviewStep />
-    case 'draft_response':
-      return <DraftResponseStep />
-    case 'final_approval':
-      return <FinalApprovalStep />
+    case 'response':
+      return <ResponseStep />
+    case 'review':
+      return <ReviewStep />
     default:
       return null
   }

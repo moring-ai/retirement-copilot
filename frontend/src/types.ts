@@ -11,25 +11,22 @@
 export type ToolStatus = 'ok' | 'error'
 export type ConfidenceLevel = 'High' | 'Medium' | 'Low'
 
-/** Case step statuses, styled distinctly in the sidebar. */
+/** Case step statuses, styled distinctly across the workspace. */
 export type StepStatus = 'complete' | 'in_progress' | 'needs_info' | 'pending'
+
+/** Top-level app view. */
+export type AppView = 'home' | 'workspace'
 
 export type StepId =
   | 'customer_snapshot'
-  | 'rollover_goal'
-  | 'eligibility_check'
+  | 'goal_eligibility'
   | 'required_forms'
   | 'compliance_review'
-  | 'draft_response'
-  | 'final_approval'
+  | 'response'
+  | 'review'
 
-/** Which of the four agent actions is currently simulating. */
-export type RunningAction =
-  | 'eligibility'
-  | 'forms'
-  | 'compliance'
-  | 'draft'
-  | null
+/** Which of the agent actions is currently simulating. */
+export type RunningAction = 'eligibility' | 'forms' | 'compliance' | 'draft' | null
 
 // ---------------------------------------------------------------------------
 // Customer record (mirrors mock_customers.json)
@@ -74,6 +71,7 @@ export interface Customer {
   contact_preference: string
   email: string
   phone: string
+  date_of_birth: string
   ssn_last4: string
   risk_flags: string[]
   has_existing_fidelity_ira: boolean
@@ -84,6 +82,16 @@ export interface Customer {
   account_restrictions: string[]
   documents: CustomerDocuments
   case_status: CaseStatus
+}
+
+// ---------------------------------------------------------------------------
+// Rollover goals (associate-selectable)
+// ---------------------------------------------------------------------------
+
+export interface RolloverGoalOption {
+  id: string
+  label: string
+  description: string
 }
 
 // ---------------------------------------------------------------------------
@@ -105,10 +113,21 @@ export interface RagSource {
   score: number
 }
 
+/** An associate-uploaded document held in approved Fidelity storage. */
+export interface CustomSource {
+  id: string
+  name: string
+  sizeLabel: string
+}
+
+export type ToolApprovalMode = 'ask_every_time' | 'full_control'
+export type ToolApproval = 'pending' | 'approved' | 'denied'
+
 export interface ToolCalled {
   tool: string
   status: ToolStatus
   detail?: string
+  approval: ToolApproval
 }
 
 export interface TimelineEvent {
@@ -128,13 +147,6 @@ export interface EvidenceState {
   complianceWarnings: string[]
 }
 
-export interface ReviewQueueItem {
-  id: string
-  label: string
-  hint?: string
-  checked: boolean
-}
-
 export interface EligibilityResult {
   eligible: boolean
   headline: string
@@ -147,12 +159,83 @@ export interface RolloverPath {
   avoids: string[]
 }
 
+// ---------------------------------------------------------------------------
+// Compliance
+// ---------------------------------------------------------------------------
+
+export type IssueSeverity = 'critical' | 'warning' | 'info'
+export type IssueRecommendation =
+  | 'escalate_supervisor'
+  | 'reassign_specialist'
+  | 'reject_case'
+  | 'proceed'
+
+export interface ComplianceIssue {
+  id: string
+  title: string
+  detail: string
+  severity: IssueSeverity
+  recommendation: IssueRecommendation
+  recommendationDetail: string
+}
+
+// ---------------------------------------------------------------------------
+// Uploaded / filled forms
+// ---------------------------------------------------------------------------
+
+export type FormVerifyStatus = 'unverified' | 'verifying' | 'verified' | 'issues'
+
+export interface UploadedForm {
+  id: string
+  name: string
+  sizeLabel: string
+  status: FormVerifyStatus
+  comments: string[]
+}
+
+// ---------------------------------------------------------------------------
+// Case list (home screen)
+// ---------------------------------------------------------------------------
+
+export type CaseStage = 'draft' | 'in_review' | 'submitted' | 'escalated'
+
+export interface CaseSummary {
+  id: string
+  customerId: string
+  customerName: string
+  goalLabel: string
+  stage: CaseStage
+  currentStep: StepId
+  progressPct: number
+  lastUpdatedBy: string
+  lastUpdatedAt: number
+  createdAt: number
+}
+
+// ---------------------------------------------------------------------------
+// Workspace state
+// ---------------------------------------------------------------------------
+
 export interface WorkspaceState {
+  view: AppView
+  cases: CaseSummary[]
+  activeCaseId: string | null
   activeCustomerId: string
   activeStep: StepId
   stepStatuses: Record<StepId, StepStatus>
   runningAction: RunningAction
   evidence: EvidenceState
+
+  identityVerified: boolean
+  selectedGoalId: string | null
+  toolApprovalMode: ToolApprovalMode
+
+  customSources: CustomSource[]
+  uploadedForms: UploadedForm[]
+  complianceIssues: ComplianceIssue[]
+  responseApproved: boolean
+  complianceDocApproved: boolean
+
   findings: Finding[]
   eligibilityResult: EligibilityResult | null
   rolloverPath: RolloverPath | null
@@ -160,5 +243,4 @@ export interface WorkspaceState {
   missingInformation: string[]
   recommendedAction: string | null
   draftText: string
-  reviewQueue: ReviewQueueItem[]
 }

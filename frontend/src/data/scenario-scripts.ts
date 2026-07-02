@@ -1,5 +1,10 @@
 import type { Action } from '@/state/workspace-reducer'
-import type { Customer, RunningAction, TimelineEvent } from '@/types'
+import type {
+  ComplianceIssue,
+  Customer,
+  RunningAction,
+  TimelineEvent,
+} from '@/types'
 import { source } from '@/data/rag-sources'
 
 // A "beat" is a set of reducer actions dispatched at a relative time offset.
@@ -87,7 +92,7 @@ function eligibilityScript(c: Customer): Beat[] {
       atMs: 0,
       actions: [
         { type: 'START_ACTION', action: 'eligibility' },
-        { type: 'SET_STEP_STATUS', step: 'eligibility_check', status: 'in_progress' },
+        { type: 'SET_STEP_STATUS', step: 'goal_eligibility', status: 'in_progress' },
         {
           type: 'ADD_TIMELINE',
           event: ev(
@@ -164,7 +169,7 @@ function eligibilityScript(c: Customer): Beat[] {
                 'Eligibility check complete — direct rollover recommended',
               ),
             },
-            { type: 'SET_STEP_STATUS', step: 'eligibility_check', status: 'complete' },
+            { type: 'SET_STEP_STATUS', step: 'goal_eligibility', status: 'complete' },
             { type: 'FINISH_ACTION' },
           ]
         : [
@@ -200,7 +205,7 @@ function eligibilityScript(c: Customer): Beat[] {
                 'Rollover eligibility unknown; restrictions present',
               ),
             },
-            { type: 'SET_STEP_STATUS', step: 'eligibility_check', status: 'needs_info' },
+            { type: 'SET_STEP_STATUS', step: 'goal_eligibility', status: 'needs_info' },
             { type: 'FINISH_ACTION' },
           ],
     },
@@ -278,8 +283,93 @@ function formsScript(c: Customer): Beat[] {
 // 3. Check Compliance
 // ---------------------------------------------------------------------------
 
+function buildComplianceIssues(c: Customer): ComplianceIssue[] {
+  const issues: ComplianceIssue[] = []
+
+  if (c.account_restrictions.some((r) => r.toLowerCase().includes('beneficiary'))) {
+    issues.push({
+      id: 'beneficiary-dispute',
+      title: 'Unresolved beneficiary dispute on the account',
+      detail:
+        'An open beneficiary dispute is recorded against the customer account. Processing a rollover while ownership of the beneficiary designation is contested exposes Fidelity to downstream liability.',
+      severity: 'critical',
+      recommendation: 'escalate_supervisor',
+      recommendationDetail:
+        'Escalate to your supervisor and place the case on hold until the beneficiary dispute is formally resolved by the specialist team.',
+    })
+  }
+
+  if (c.documents.identity_verification !== 'complete') {
+    issues.push({
+      id: 'identity-incomplete',
+      title: 'Identity verification is incomplete',
+      detail:
+        'KYC identity verification has not been completed. No servicing action can proceed on the account until identity is fully verified per policy.',
+      severity: 'critical',
+      recommendation: 'reject_case',
+      recommendationDetail:
+        'Do not proceed. Return the case to intake to complete identity verification before any rollover work resumes.',
+    })
+  }
+
+  if (c.source_plan.outstanding_plan_loan) {
+    issues.push({
+      id: 'plan-loan',
+      title: 'Outstanding loan against the source 401(k)',
+      detail:
+        'The former-employer plan carries an outstanding participant loan. A rollover may trigger a deemed distribution of the loan balance with tax consequences.',
+      severity: 'warning',
+      recommendation: 'reassign_specialist',
+      recommendationDetail:
+        'Reassign to a rollover specialist to confirm loan-offset handling before initiating any transfer.',
+    })
+  }
+
+  if (c.source_plan.rollover_allowed !== true) {
+    issues.push({
+      id: 'eligibility-unknown',
+      title: 'Rollover eligibility is unconfirmed',
+      detail:
+        'The source plan has not confirmed that a rollover is permitted. Proceeding without confirmation risks an out-of-policy transfer.',
+      severity: 'warning',
+      recommendation: 'reassign_specialist',
+      recommendationDetail:
+        'Have a specialist confirm eligibility directly with the plan provider before drafting a customer response.',
+    })
+  }
+
+  if (c.account_restrictions.some((r) => r.toLowerCase().includes('address'))) {
+    issues.push({
+      id: 'address-mismatch',
+      title: 'Address mismatch flagged on file',
+      detail:
+        'The address on the account does not match recent records. This is a fraud-prevention signal that must be cleared before servicing.',
+      severity: 'warning',
+      recommendation: 'reassign_specialist',
+      recommendationDetail:
+        'Route to the fraud-prevention queue to reconcile the address before proceeding.',
+    })
+  }
+
+  if (issues.length === 0) {
+    issues.push({
+      id: 'no-blockers',
+      title: 'No compliance blockers detected',
+      detail:
+        'Identity is verified, no account restrictions are present, and the source plan permits the rollover. The case may proceed to a drafted customer response.',
+      severity: 'info',
+      recommendation: 'proceed',
+      recommendationDetail:
+        'Proceed to draft the customer response. Standard human review still applies before anything is sent.',
+    })
+  }
+
+  return issues
+}
+
 function complianceScript(c: Customer): Beat[] {
   const clean = isClean(c)
+  const issues = buildComplianceIssues(c)
 
   return [
     {
@@ -321,6 +411,7 @@ function complianceScript(c: Customer): Beat[] {
       atMs: 2100,
       actions: clean
         ? [
+            { type: 'SET_COMPLIANCE_ISSUES', issues },
             {
               type: 'ADD_TIMELINE',
               event: ev(
@@ -332,6 +423,7 @@ function complianceScript(c: Customer): Beat[] {
             { type: 'FINISH_ACTION' },
           ]
         : [
+            { type: 'SET_COMPLIANCE_ISSUES', issues },
             { type: 'ADD_SOURCE', source: source('tax_boundaries') },
             {
               type: 'ADD_COMPLIANCE_WARNING',
@@ -394,7 +486,7 @@ function draftScript(c: Customer): Beat[] {
       atMs: 0,
       actions: [
         { type: 'START_ACTION', action: 'draft' },
-        { type: 'SET_STEP_STATUS', step: 'draft_response', status: 'in_progress' },
+        { type: 'SET_STEP_STATUS', step: 'response', status: 'in_progress' },
         {
           type: 'ADD_TIMELINE',
           event: ev(0, 'Drafting associate-facing customer response'),
@@ -419,7 +511,7 @@ function draftScript(c: Customer): Beat[] {
           type: 'ADD_TIMELINE',
           event: ev(2400, 'Draft ready for associate review'),
         },
-        { type: 'SET_STEP_STATUS', step: 'draft_response', status: 'complete' },
+        { type: 'SET_STEP_STATUS', step: 'response', status: 'complete' },
         { type: 'FINISH_ACTION' },
       ],
     },

@@ -1,6 +1,5 @@
-import { Gauge, ShieldAlert, AlertTriangle } from 'lucide-react'
+import { Gauge, ShieldAlert } from 'lucide-react'
 import type { ConfidenceLevel } from '@/types'
-import { SectionHeading } from './SectionHeading'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
@@ -13,87 +12,74 @@ const CONFIDENCE_STYLE: Record<
   Low: { bar: 'bg-danger', text: 'text-danger', pct: 30 },
 }
 
+/**
+ * The headline agent judgement. Rendered as the first, highlighted, sticky
+ * block of the evidence panel so it stays in view while the rest scrolls.
+ */
 export function ConfidenceRiskPanel({
   confidence,
   riskTags,
-  complianceWarnings,
 }: {
   confidence: ConfidenceLevel | null
   riskTags: string[]
-  complianceWarnings: string[]
 }) {
   const style = confidence ? CONFIDENCE_STYLE[confidence] : null
 
   return (
-    <section>
-      <SectionHeading icon={Gauge} title="Confidence & Risk" />
-      <div className="mt-3 space-y-3">
-        <div className="rounded-lg border border-border bg-background/60 p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">
-              Agent confidence
-            </span>
-            <span
-              className={cn(
-                'text-sm font-semibold',
-                style ? style.text : 'text-muted-foreground',
-              )}
-            >
-              {confidence ?? '—'}
-            </span>
+    <div className="sticky top-0 z-10 -mx-4 border-b border-border bg-card/95 px-4 pb-3 pt-4 backdrop-blur">
+      <div
+        className={cn(
+          'rounded-xl border p-3 shadow-soft',
+          confidence
+            ? 'border-brand/20 bg-gradient-to-br from-brand-soft/70 to-card'
+            : 'border-border bg-background/60',
+        )}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-soft">
+            <Gauge className="h-4 w-4 text-brand-dark" />
+            Confidence &amp; Risk
           </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className={cn(
-                'h-full rounded-full transition-all duration-500',
-                style?.bar,
-              )}
-              style={{ width: `${style?.pct ?? 0}%` }}
-            />
-          </div>
+          <span
+            className={cn(
+              'text-sm font-bold tabular-nums',
+              style ? style.text : 'text-muted-foreground',
+            )}
+          >
+            {confidence ?? '—'}
+          </span>
         </div>
 
-        <div>
-          <div className="flex items-center gap-1.5 text-xs font-medium text-ink-soft">
-            <ShieldAlert className="h-3.5 w-3.5 text-warn" />
-            Risk tags
-          </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
+        <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className={cn(
+              'h-full rounded-full transition-all duration-700 ease-out',
+              style?.bar,
+            )}
+            style={{ width: `${style?.pct ?? 0}%` }}
+          />
+        </div>
+
+        <div className="mt-3 flex items-start gap-1.5">
+          <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warn" />
+          <div className="flex flex-wrap gap-1.5">
             {riskTags.length ? (
               riskTags.map((tag) => (
                 <Badge
                   key={tag}
-                  variant={
-                    tag.toLowerCase().includes('low') ? 'default' : 'warn'
-                  }
+                  variant={tag.toLowerCase().includes('low') ? 'default' : 'warn'}
                 >
                   {tag}
                 </Badge>
               ))
             ) : (
               <span className="text-xs text-muted-foreground">
-                None identified yet
+                No risk flags yet
               </span>
             )}
           </div>
         </div>
-
-        {complianceWarnings.length > 0 && (
-          <div className="rounded-lg border border-warn/20 bg-warn-soft p-3">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-warn">
-              <AlertTriangle className="h-3.5 w-3.5" />
-              Compliance warnings
-            </div>
-            <ul className="mt-2 space-y-1.5">
-              {complianceWarnings.map((w) => (
-                <li key={w} className="text-xs leading-relaxed text-ink-soft">
-                  • {w}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
       </div>
-    </section>
+    </div>
   )
 }

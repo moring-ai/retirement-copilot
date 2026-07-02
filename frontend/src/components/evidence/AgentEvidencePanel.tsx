@@ -2,6 +2,7 @@ import { Sparkles, Loader2 } from 'lucide-react'
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { ActivityTimeline } from './ActivityTimeline'
 import { SourcesUsedList } from './SourcesUsedList'
+import { CustomSourcesList } from './CustomSourcesList'
 import { ConfidenceRiskPanel } from './ConfidenceRiskPanel'
 import { ToolCallLog } from './ToolCallLog'
 import { EvidenceEmptyState } from './EvidenceEmptyState'
@@ -14,6 +15,8 @@ export function AgentEvidencePanel() {
     evidence.timeline.length > 0 ||
     evidence.toolCalls.length > 0 ||
     evidence.sources.length > 0
+  const showConfidence =
+    evidence.confidence !== null || evidence.riskTags.length > 0
 
   return (
     <div className="flex h-full flex-col">
@@ -37,23 +40,48 @@ export function AgentEvidencePanel() {
         )}
       </div>
 
-      <div className="scrollbar-slim flex-1 overflow-y-auto px-4 py-4">
+      <div className="scrollbar-slim flex-1 overflow-y-auto px-4 pb-5">
         {!hasActivity ? (
-          <EvidenceEmptyState />
-        ) : (
-          <div className="space-y-5">
-            <ActivityTimeline events={evidence.timeline} />
-            <Separator />
-            <ToolCallLog calls={evidence.toolCalls} />
-            <Separator />
-            <SourcesUsedList sources={evidence.sources} />
-            <Separator />
-            <ConfidenceRiskPanel
-              confidence={evidence.confidence}
-              riskTags={evidence.riskTags}
-              complianceWarnings={evidence.complianceWarnings}
-            />
+          <div className="pt-4">
+            <EvidenceEmptyState />
+            {/* Even with no run yet, the associate can pre-load context. */}
+            <div className="mt-4">
+              <CustomSourcesList />
+            </div>
           </div>
+        ) : (
+          <>
+            {/* 1 — headline judgement, sticky + highlighted */}
+            {showConfidence && (
+              <ConfidenceRiskPanel
+                confidence={evidence.confidence}
+                riskTags={evidence.riskTags}
+              />
+            )}
+
+            <div className="space-y-5 pt-4">
+              {/* 2 — tool calls needing your approval */}
+              {evidence.toolCalls.length > 0 && (
+                <>
+                  <ToolCallLog />
+                  <Separator />
+                </>
+              )}
+
+              {/* 3 — grounding: approved guidance + Fidelity storage */}
+              <section>
+                <SourcesUsedList sources={evidence.sources} />
+                <CustomSourcesList />
+              </section>
+              <Separator />
+
+              {/* 4 — audit trail, collapsed by default */}
+              <ActivityTimeline
+                events={evidence.timeline}
+                running={runningAction !== null}
+              />
+            </div>
+          </>
         )}
       </div>
     </div>
