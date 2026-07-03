@@ -7,10 +7,12 @@ import {
   ArrowRight,
   AlertTriangle,
   PartyPopper,
+  BellRing,
 } from 'lucide-react'
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { useSimulatedAgentRun } from '@/hooks/useSimulatedAgentRun'
 import { useRegisterIslandActions } from '@/lib/island-store'
+import { toast } from '@/components/ui/use-toast'
 import { StepHeader } from './StepHeader'
 import { StepConfirm } from './StepConfirm'
 import { MissingInformationCard } from '@/components/eligibility/MissingInformationCard'
@@ -83,6 +85,17 @@ export function RequiredFormsStep() {
     }),
     [hasRun, allClear, hasIssues, runningAction],
   )
+
+  const notifyAndPend = () => {
+    if (state.activeCaseId)
+      dispatch({ type: 'SET_CASE_STAGE', caseId: state.activeCaseId, stage: 'pending' })
+    toast({
+      variant: 'info',
+      title: 'Customer notified',
+      description: 'Case moved to pending and sent to review.',
+    })
+    dispatch({ type: 'SELECT_STEP', step: 'review' })
+  }
 
   return (
     <div className="flex flex-1 flex-col space-y-5">
@@ -178,6 +191,26 @@ export function RequiredFormsStep() {
               </ul>
             )}
           </StepConfirm>
+
+          {!allClear && (
+            <button
+              type="button"
+              onClick={notifyAndPend}
+              className="mt-4 flex w-full items-start gap-3 rounded-lg border border-warn/30 bg-warn-soft/50 p-4 text-left transition-colors hover:bg-warn-soft"
+            >
+              <BellRing className="mt-0.5 h-5 w-5 shrink-0 text-warn" />
+              <div>
+                <p className="text-sm font-semibold text-ink">
+                  Notify the customer to update documents
+                </p>
+                <p className="mt-0.5 text-sm text-ink-soft">
+                  Documents are still outstanding. Notify the customer, move this
+                  case to <span className="font-medium">Pending</span>, and send
+                  it to review.
+                </p>
+              </div>
+            </button>
+          )}
         </div>
       )}
     </div>

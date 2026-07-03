@@ -2,7 +2,6 @@ import { useWorkspace } from '@/state/WorkspaceContext'
 import { CaseHome } from '@/components/home/CaseHome'
 import { WorkflowStepper } from '@/components/layout/WorkflowStepper'
 import { AgentIsland } from '@/components/layout/AgentIsland'
-import { ConfidenceShelf } from '@/components/layout/ConfidenceShelf'
 import { StepPanel } from '@/components/steps/StepPanel'
 
 export function AppShell() {
@@ -28,10 +27,7 @@ export function AppShell() {
         </div>
       </main>
 
-      {/* Constant confidence & risk shelf (after eligibility) */}
-      <ConfidenceShelf />
-
-      {/* Floating dynamic-island agent bar */}
+      {/* Floating dynamic-island agent bar (confidence gauge lives inside it) */}
       <AgentIsland />
     </div>
   )

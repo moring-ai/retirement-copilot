@@ -1,6 +1,7 @@
 import type {
   AppView,
   CasePriority,
+  CaseStage,
   CaseSummary,
   ComplianceIssue,
   ConfidenceLevel,
@@ -90,6 +91,7 @@ export type Action =
   | { type: 'SET_RESPONSE_APPROVED'; approved: boolean }
   | { type: 'SET_COMPLIANCE_DOC_APPROVED'; approved: boolean }
   | { type: 'SET_CASE_PRIORITY'; caseId: string; priority: CasePriority }
+  | { type: 'SET_CASE_STAGE'; caseId: string; stage: CaseStage }
   | { type: 'TRANSFER_CASE'; caseId: string; toAssociate: string; note?: string }
   | { type: 'ACCEPT_TRANSFER'; requestId: string }
   | { type: 'DECLINE_TRANSFER'; requestId: string }
@@ -374,13 +376,17 @@ function touchCase(state: WorkspaceState): WorkspaceState {
           goalLabel: goalLabel(state.selectedGoalId),
           currentStep: state.activeStep,
           progressPct: progressPct(state.stepStatuses),
-          stage: allComplete
-            ? ('submitted' as const)
-            : escalated
-              ? ('escalated' as const)
-              : c.stage === 'draft' && state.identityVerified
-                ? ('in_review' as const)
-                : c.stage,
+          // Preserve associate-set terminal stages; otherwise derive from progress.
+          stage:
+            c.stage === 'pending' || c.stage === 'rejected'
+              ? c.stage
+              : allComplete
+                ? ('submitted' as const)
+                : escalated
+                  ? ('escalated' as const)
+                  : c.stage === 'draft' && state.identityVerified
+                    ? ('in_review' as const)
+                    : c.stage,
           lastUpdatedBy: CURRENT_ASSOCIATE,
           lastUpdatedAt: now(),
         }
@@ -683,6 +689,21 @@ export function workspaceReducer(
         ...state,
         cases: state.cases.map((c) =>
           c.id === action.caseId ? { ...c, priority: action.priority } : c,
+        ),
+      }
+
+    case 'SET_CASE_STAGE':
+      return {
+        ...state,
+        cases: state.cases.map((c) =>
+          c.id === action.caseId
+            ? {
+                ...c,
+                stage: action.stage,
+                lastUpdatedBy: CURRENT_ASSOCIATE,
+                lastUpdatedAt: now(),
+              }
+            : c,
         ),
       }
 

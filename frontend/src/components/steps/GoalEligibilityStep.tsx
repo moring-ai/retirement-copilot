@@ -4,8 +4,6 @@ import {
   ArrowRight,
   ChevronDown,
   ShieldCheck,
-  Loader2,
-  Rocket,
   Pause,
   AlertTriangle,
   RefreshCw,
@@ -23,7 +21,6 @@ import { RolloverPathCard } from '@/components/eligibility/RolloverPathCard'
 import { RecommendedActionCard } from '@/components/eligibility/RecommendedActionCard'
 import { FindingsCard } from '@/components/eligibility/FindingsCard'
 import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   DropdownMenu,
@@ -97,7 +94,7 @@ export function GoalEligibilityStep({ customer }: { customer: Customer }) {
   // Once every check passes, count down and advance to Required Forms.
   useEffect(() => {
     if (sawRun.current && !paused && clean && countdown === null) {
-      setCountdown(10)
+      setCountdown(5)
     }
   }, [clean, paused, countdown])
 
@@ -119,8 +116,34 @@ export function GoalEligibilityStep({ customer }: { customer: Customer }) {
     setCountdown(null)
   }
 
-  useRegisterIslandActions(
-    () => ({
+  useRegisterIslandActions(() => {
+    // Autopilot countdown — surfaced in the island instead of an in-content card.
+    if (countdown !== null) {
+      return {
+        stepId: 'goal_eligibility',
+        title: 'Autopilot engaged',
+        hint: 'Advancing to Required Forms',
+        statusText: `All checks passed — Required Forms in ${countdown}s`,
+        actions: [
+          {
+            id: 'gonow',
+            label: 'Go now',
+            primary: true,
+            icon: ArrowRight,
+            onClick: () =>
+              dispatch({ type: 'SELECT_STEP', step: 'required_forms' }),
+          },
+          {
+            id: 'stay',
+            label: 'Stay',
+            variant: 'outline',
+            icon: Pause,
+            onClick: cancelAutopilot,
+          },
+        ],
+      }
+    }
+    return {
       stepId: 'goal_eligibility',
       title: !hasResult
         ? 'Eligibility'
@@ -130,6 +153,14 @@ export function GoalEligibilityStep({ customer }: { customer: Customer }) {
       hint: hasResult
         ? 'Continue to identify the required forms'
         : 'The agent runs the check automatically',
+      statusText:
+        hasResult && !clean
+          ? pendingTools.length > 0
+            ? `Paused — approve ${pendingTools.length} tool call${pendingTools.length > 1 ? 's' : ''}`
+            : escalation
+              ? 'Needs your review before continuing'
+              : undefined
+          : undefined,
       actions: hasResult
         ? [
             {
@@ -150,9 +181,8 @@ export function GoalEligibilityStep({ customer }: { customer: Customer }) {
             },
           ]
         : [],
-    }),
-    [hasResult, clean, runningAction],
-  )
+    }
+  }, [hasResult, clean, runningAction, countdown, pendingTools.length, escalation])
 
   return (
     <div className="flex flex-1 flex-col space-y-5">
@@ -246,71 +276,6 @@ export function GoalEligibilityStep({ customer }: { customer: Customer }) {
       </div>
 
       <CustomerDetailsCard customer={customer} />
-
-      {/* Autopilot status */}
-      {countdown !== null ? (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-brand/30 bg-brand-soft px-4 py-3 animate-fade-in">
-          <Rocket className="h-5 w-5 shrink-0 text-brand-dark" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-ink">
-              All checks passed — autopilot engaged
-            </p>
-            <p className="text-xs text-ink-soft">
-              Moving to Required Forms in{' '}
-              <span className="font-semibold tabular-nums text-brand-dark">
-                {countdown}s
-              </span>
-              . Stay to review, or jump ahead.
-            </p>
-          </div>
-          <Button variant="outline" size="sm" onClick={cancelAutopilot}>
-            <Pause />
-            Stay
-          </Button>
-          <Button
-            size="sm"
-            onClick={() =>
-              dispatch({ type: 'SELECT_STEP', step: 'required_forms' })
-            }
-          >
-            Go now
-            <ArrowRight />
-          </Button>
-        </div>
-      ) : running ? (
-        <div className="flex items-center gap-3 rounded-xl border border-secondary/30 bg-accent px-4 py-3 animate-fade-in">
-          <Loader2 className="h-5 w-5 shrink-0 animate-spin text-secondary" />
-          <div>
-            <p className="text-sm font-semibold text-ink">
-              Autopilot — running the eligibility check…
-            </p>
-            <p className="text-xs text-ink-soft">
-              The agent is gathering data and checking policy. You’re watching.
-            </p>
-          </div>
-        </div>
-      ) : hasResult && pendingTools.length > 0 ? (
-        <div className="flex items-start gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 animate-fade-in">
-          <Pause className="mt-0.5 h-5 w-5 shrink-0 text-warn" />
-          <p className="text-sm text-ink-soft">
-            <span className="font-semibold text-ink">Autopilot paused</span> —
-            approve the {pendingTools.length} pending tool call
-            {pendingTools.length > 1 ? 's' : ''} in the Agent Evidence panel to
-            continue, or switch to “Full control”.
-          </p>
-        </div>
-      ) : hasResult && escalation ? (
-        <div className="flex items-start gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 animate-fade-in">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warn" />
-          <p className="text-sm text-ink-soft">
-            <span className="font-semibold text-ink">
-              Autopilot paused — needs your review.
-            </span>{' '}
-            This case can’t proceed automatically. Review the findings and
-            recommendations before continuing.
-          </p>
-        </div>
-      ) : null}
 
       <div ref={resultsRef} className="scroll-mt-36">
         {running && !hasResult ? (

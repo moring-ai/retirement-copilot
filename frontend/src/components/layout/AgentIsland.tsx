@@ -3,6 +3,7 @@ import {
   Sparkles,
   Loader2,
   ChevronUp,
+  ChevronDown,
   X,
   Wrench,
   Puzzle,
@@ -10,21 +11,97 @@ import {
   Ban,
   Clock3,
 } from 'lucide-react'
+import type { ConfidenceLevel } from '@/types'
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { useIslandSpec, type IslandAction } from '@/lib/island-store'
 import { deriveSkills } from '@/lib/agentSkills'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
-function ActionButton({ a, full }: { a: IslandAction; full?: boolean }) {
+const CONF: Record<ConfidenceLevel, { pct: number; fill: string; text: string }> = {
+  High: { pct: 92, fill: 'bg-brand', text: 'text-brand-dark' },
+  Medium: { pct: 60, fill: 'bg-warn', text: 'text-warn' },
+  Low: { pct: 28, fill: 'bg-danger', text: 'text-danger' },
+}
+
+/** Battery-style confidence gauge shown inside the island. */
+function ConfidenceBattery({ level }: { level: ConfidenceLevel }) {
+  const c = CONF[level]
+  return (
+    <div className="hidden shrink-0 items-center gap-1.5 sm:flex" title={`Confidence: ${level}`}>
+      <span className="relative flex h-4 w-8 items-center rounded-[3px] border border-ink-soft/40 p-[2px]">
+        <span
+          className={cn('h-full rounded-[1px] transition-all duration-700', c.fill)}
+          style={{ width: `${c.pct}%` }}
+        />
+        <span className="absolute -right-[3px] top-1/2 h-1.5 w-[2px] -translate-y-1/2 rounded-r bg-ink-soft/40" />
+      </span>
+      <span className={cn('text-[11px] font-semibold', c.text)}>{level}</span>
+    </div>
+  )
+}
+
+function ActionButton({ a }: { a: IslandAction }) {
   const Icon = a.icon
+  if (a.menu && a.menu.length > 0) {
+    return (
+      <div className="inline-flex">
+        <Button
+          size="sm"
+          variant={a.variant ?? 'default'}
+          disabled={a.disabled}
+          onClick={a.onClick}
+          className="rounded-r-none"
+        >
+          {Icon && <Icon />}
+          {a.label}
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="sm"
+              variant={a.variant ?? 'default'}
+              disabled={a.disabled}
+              aria-label="More actions"
+              className="rounded-l-none border-l border-white/25 px-1.5"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {a.menu.map((m) => {
+              const MI = m.icon
+              return (
+                <DropdownMenuItem key={m.id} onSelect={m.onClick}>
+                  <span
+                    className={cn(
+                      'flex items-center gap-2',
+                      m.danger ? 'text-danger' : 'text-ink',
+                    )}
+                  >
+                    {MI && <MI className="h-3.5 w-3.5" />}
+                    {m.label}
+                  </span>
+                </DropdownMenuItem>
+              )
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    )
+  }
   return (
     <Button
       size="sm"
       variant={a.variant ?? 'default'}
       disabled={a.disabled}
       onClick={a.onClick}
-      className={full ? 'flex-1 justify-center' : undefined}
     >
       {Icon && <Icon />}
       {a.label}
@@ -34,21 +111,24 @@ function ActionButton({ a, full }: { a: IslandAction; full?: boolean }) {
 
 export function AgentIsland() {
   const { state } = useWorkspace()
-  const { timeline, toolCalls } = state.evidence
+  const { timeline, toolCalls, confidence } = state.evidence
   const running = state.runningAction !== null
   const [open, setOpen] = useState(false)
 
   const spec = useIslandSpec()
-  const actions = spec && spec.stepId === state.activeStep ? spec.actions : []
+  const forStep = spec && spec.stepId === state.activeStep ? spec : null
+  const actions = forStep?.actions ?? []
   const primary = actions.find((a) => a.primary) ?? actions[0]
   const skills = deriveSkills(state)
 
   const latest = timeline[timeline.length - 1]
-  const statusText = running
-    ? (latest?.label ?? 'Working…')
-    : latest
-      ? latest.label
-      : 'Agent ready — no activity yet'
+  const statusText =
+    forStep?.statusText ??
+    (running
+      ? (latest?.label ?? 'Working…')
+      : latest
+        ? latest.label
+        : 'Agent ready — no activity yet')
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-4 z-30 flex justify-center px-4">
@@ -136,10 +216,10 @@ export function AgentIsland() {
             {/* Actions (submit) — nearest the pill */}
             {actions.length > 0 && (
               <div className="border-t border-border bg-muted/40 px-4 py-3">
-                {spec?.title && (
+                {forStep?.title && (
                   <p className="mb-2 text-xs text-ink-soft">
-                    <span className="font-semibold text-ink">{spec.title}</span>
-                    {spec.hint ? ` — ${spec.hint}` : ''}
+                    <span className="font-semibold text-ink">{forStep.title}</span>
+                    {forStep.hint ? ` — ${forStep.hint}` : ''}
                   </p>
                 )}
                 <div className="flex flex-wrap gap-2">
@@ -175,12 +255,14 @@ export function AgentIsland() {
               {running ? 'Agent working' : 'Agent'}
             </p>
             <p
-              key={latest?.id ?? (running ? 'run' : 'idle')}
+              key={statusText}
               className="animate-fade-in truncate text-sm font-medium text-ink"
             >
               {statusText}
             </p>
           </div>
+
+          {confidence && <ConfidenceBattery level={confidence} />}
 
           {primary && !open && <ActionButton a={primary} />}
 

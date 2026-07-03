@@ -6,7 +6,8 @@ import {
   FileText,
   CheckCircle2,
   PenLine,
-  Send,
+  PauseCircle,
+  XCircle,
   Home,
   type LucideIcon,
 } from 'lucide-react'
@@ -76,13 +77,26 @@ export function ReviewStep() {
     result !== null &&
     state.responseApproved
 
-  const submit = () => {
+  const caseId = state.activeCaseId ?? customer.customer_id
+
+  const approve = () => {
     dispatch({ type: 'SET_STEP_STATUS', step: 'review', status: 'complete' })
     toast({
       variant: 'success',
-      title: 'Submitted for review',
-      description: `${state.activeCaseId ?? customer.customer_id} sent to a retirement servicing reviewer.`,
+      title: 'Case approved',
+      description: `${caseId} approved and finalised.`,
     })
+  }
+
+  const moveTo = (stage: 'pending' | 'rejected') => {
+    if (state.activeCaseId)
+      dispatch({ type: 'SET_CASE_STAGE', caseId: state.activeCaseId, stage })
+    toast({
+      variant: 'info',
+      title: stage === 'pending' ? 'Moved to pending' : 'Case rejected',
+      description: `${caseId} marked ${stage}.`,
+    })
+    dispatch({ type: 'GO_HOME' })
   }
 
   useRegisterIslandActions(
@@ -109,12 +123,27 @@ export function ReviewStep() {
           ]
         : [
             {
-              id: 'submit',
-              label: 'Submit to Review',
+              id: 'approve',
+              label: 'Approve',
               primary: true,
-              icon: Send,
+              icon: CheckCircle2,
               disabled: !ready,
-              onClick: submit,
+              onClick: approve,
+              menu: [
+                {
+                  id: 'pending',
+                  label: 'Move to Pending',
+                  icon: PauseCircle,
+                  onClick: () => moveTo('pending'),
+                },
+                {
+                  id: 'reject',
+                  label: 'Reject case',
+                  icon: XCircle,
+                  danger: true,
+                  onClick: () => moveTo('rejected'),
+                },
+              ],
             },
           ],
     }),
@@ -201,20 +230,20 @@ export function ReviewStep() {
 
       <StepConfirm
         tone={submitted || ready ? 'success' : 'info'}
-        icon={submitted ? CheckCircle2 : Send}
+        icon={submitted ? CheckCircle2 : PenLine}
         title={
           submitted
-            ? 'Submitted for review'
+            ? 'Case approved'
             : ready
-              ? 'Ready to submit'
-              : 'Complete the case to submit'
+              ? 'Ready to approve'
+              : 'Complete the case to approve'
         }
         description={
           submitted
-            ? 'Sent to a retirement servicing reviewer.'
+            ? 'This case has been approved and finalised.'
             : ready
-              ? 'Everything checks out. Submit this case for a reviewer.'
-              : 'Identity, goal, eligibility, and an approved response are required before submitting.'
+              ? 'Everything checks out — approve, or use the caret to move it to pending or reject.'
+              : 'Identity, goal, eligibility, and an approved response are required before approving.'
         }
       />
     </div>

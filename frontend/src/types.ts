@@ -198,7 +198,13 @@ export interface UploadedForm {
 // Case list (home screen)
 // ---------------------------------------------------------------------------
 
-export type CaseStage = 'draft' | 'in_review' | 'submitted' | 'escalated'
+export type CaseStage =
+  | 'draft'
+  | 'in_review'
+  | 'submitted'
+  | 'escalated'
+  | 'pending'
+  | 'rejected'
 export type CasePriority = 'high' | 'medium' | 'low'
 
 export interface CaseSummary {

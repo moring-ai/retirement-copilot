@@ -8,6 +8,14 @@ import type { StepId } from '@/types'
 // matches the active step, so a stale spec from a just-unmounted step is
 // ignored during transitions.
 
+export interface IslandMenuItem {
+  id: string
+  label: string
+  icon?: LucideIcon
+  danger?: boolean
+  onClick: () => void
+}
+
 export interface IslandAction {
   id: string
   label: string
@@ -17,6 +25,8 @@ export interface IslandAction {
   icon?: LucideIcon
   /** The one action shown inline on the collapsed pill. */
   primary?: boolean
+  /** Optional caret menu attached to the button (split-button). */
+  menu?: IslandMenuItem[]
 }
 
 export interface IslandSpec {
@@ -24,6 +34,8 @@ export interface IslandSpec {
   /** Short label for what this step is asking for (shown in the shelf). */
   title?: string
   hint?: string
+  /** Overrides the pill status line (e.g. an autopilot countdown). */
+  statusText?: string
   actions: IslandAction[]
 }
 
