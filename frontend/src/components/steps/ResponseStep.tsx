@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { CheckCircle2, Circle, ArrowRight, PenLine } from 'lucide-react'
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { useRegisterIslandActions } from '@/lib/island-store'
@@ -53,6 +54,14 @@ export function ResponseStep() {
     dispatch({ type: 'SELECT_STEP', step: 'review' })
   }
 
+  // Auto-scroll to the generated draft once the agent finishes writing it.
+  const draftRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (hasDraft) {
+      draftRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [hasDraft])
+
   useRegisterIslandActions(
     () => ({
       stepId: 'response',
@@ -87,15 +96,17 @@ export function ResponseStep() {
       <ResponseEditor />
 
       {hasDraft && (
-        <ApprovalRow
-          checked={approved}
-          onToggle={() => {
-            if (!approved) approve()
-            else dispatch({ type: 'SET_RESPONSE_APPROVED', approved: false })
-          }}
-          title="Approve the response"
-          hint="Checking this approves the response and moves to the final review."
-        />
+        <div ref={draftRef} className="scroll-mt-24">
+          <ApprovalRow
+            checked={approved}
+            onToggle={() => {
+              if (!approved) approve()
+              else dispatch({ type: 'SET_RESPONSE_APPROVED', approved: false })
+            }}
+            title="Approve the response"
+            hint="Checking this approves the response and moves to the final review."
+          />
+        </div>
       )}
 
       {hasDraft && (
