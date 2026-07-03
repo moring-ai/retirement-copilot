@@ -23,6 +23,7 @@ import type {
 } from '@/types'
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { useSimulatedAgentRun } from '@/hooks/useSimulatedAgentRun'
+import { useRegisterIslandActions } from '@/lib/island-store'
 import { CUSTOMERS } from '@/data/customers'
 import { goalLabel } from '@/data/goals'
 import { StepHeader } from './StepHeader'
@@ -222,6 +223,45 @@ export function ComplianceReviewStep() {
     })
   }
 
+  useRegisterIslandActions(
+    () => ({
+      stepId: 'compliance_review',
+      title: !hasRun
+        ? 'Compliance review'
+        : escalation
+          ? 'Escalation — acknowledge to continue'
+          : 'Compliance cleared',
+      hint: 'Continue to draft the customer response',
+      actions: hasRun
+        ? [
+            {
+              id: 'continue',
+              label: escalation ? 'Acknowledge & Continue' : 'Continue to Response',
+              primary: true,
+              icon: ArrowRight,
+              onClick: () => dispatch({ type: 'SELECT_STEP', step: 'response' }),
+            },
+            {
+              id: 'download',
+              label: 'Download Report',
+              variant: 'outline',
+              icon: Download,
+              onClick: downloadReport,
+            },
+            {
+              id: 'rerun',
+              label: 'Re-run',
+              variant: 'outline',
+              icon: RefreshCw,
+              disabled: runningAction !== null,
+              onClick: () => run('compliance'),
+            },
+          ]
+        : [],
+    }),
+    [hasRun, escalation, runningAction],
+  )
+
   return (
     <div className="flex flex-1 flex-col space-y-5">
       <StepHeader
@@ -398,30 +438,6 @@ export function ComplianceReviewStep() {
               ? (primaryIssue?.recommendationDetail ??
                 'Review the recommendations above before continuing.')
               : 'No compliance blockers. Continue to draft the customer response.'
-          }
-          actions={
-            <>
-              <Button
-                onClick={() =>
-                  dispatch({ type: 'SELECT_STEP', step: 'response' })
-                }
-              >
-                {escalation ? 'Acknowledge & Continue' : 'Continue to Response'}
-                <ArrowRight />
-              </Button>
-              <Button variant="outline" onClick={downloadReport}>
-                <Download />
-                Download Report
-              </Button>
-              <Button
-                variant="outline"
-                disabled={runningAction !== null}
-                onClick={() => run('compliance')}
-              >
-                {running ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-                Re-run
-              </Button>
-            </>
           }
         />
       )}

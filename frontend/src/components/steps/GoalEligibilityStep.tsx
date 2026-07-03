@@ -13,6 +13,7 @@ import {
 import type { Customer } from '@/types'
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { useSimulatedAgentRun } from '@/hooks/useSimulatedAgentRun'
+import { useRegisterIslandActions } from '@/lib/island-store'
 import { ROLLOVER_GOALS } from '@/data/goals'
 import { StepHeader } from './StepHeader'
 import { StepConfirm } from './StepConfirm'
@@ -117,6 +118,41 @@ export function GoalEligibilityStep({ customer }: { customer: Customer }) {
     setPaused(true)
     setCountdown(null)
   }
+
+  useRegisterIslandActions(
+    () => ({
+      stepId: 'goal_eligibility',
+      title: !hasResult
+        ? 'Eligibility'
+        : clean
+          ? 'Eligibility confirmed'
+          : 'Eligibility needs review',
+      hint: hasResult
+        ? 'Continue to identify the required forms'
+        : 'The agent runs the check automatically',
+      actions: hasResult
+        ? [
+            {
+              id: 'continue',
+              label: 'Continue to Required Forms',
+              primary: true,
+              icon: ArrowRight,
+              onClick: () =>
+                dispatch({ type: 'SELECT_STEP', step: 'required_forms' }),
+            },
+            {
+              id: 'rerun',
+              label: 'Re-run check',
+              variant: 'outline',
+              icon: RefreshCw,
+              disabled: runningAction !== null,
+              onClick: () => run('eligibility'),
+            },
+          ]
+        : [],
+    }),
+    [hasResult, clean, runningAction],
+  )
 
   return (
     <div className="flex flex-1 flex-col space-y-5">
@@ -308,7 +344,7 @@ export function GoalEligibilityStep({ customer }: { customer: Customer }) {
         </div>
       )}
 
-      {/* --- Sticky submit bar --- */}
+      {/* Outcome summary — actions live in the agent island below */}
       {hasResult && countdown === null && (
         <StepConfirm
           tone={clean ? 'success' : 'warn'}
@@ -319,26 +355,6 @@ export function GoalEligibilityStep({ customer }: { customer: Customer }) {
               ? 'All checks passed. Continue to identify the required forms.'
               : (state.recommendedAction ??
                 'This case can’t proceed as a standard rollover. Review the findings, then continue when ready.')
-          }
-          actions={
-            <>
-              <Button
-                onClick={() =>
-                  dispatch({ type: 'SELECT_STEP', step: 'required_forms' })
-                }
-              >
-                Continue to Required Forms
-                <ArrowRight />
-              </Button>
-              <Button
-                variant="outline"
-                disabled={runningAction !== null}
-                onClick={() => run('eligibility')}
-              >
-                {running ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-                Re-run check
-              </Button>
-            </>
           }
         />
       )}

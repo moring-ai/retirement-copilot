@@ -1,11 +1,10 @@
 import { User, Landmark, Wallet, ShieldCheck, ArrowRight } from 'lucide-react'
 import type { Customer } from '@/types'
 import { useWorkspace } from '@/state/WorkspaceContext'
+import { useRegisterIslandActions } from '@/lib/island-store'
 import { StepHeader } from './StepHeader'
-import { StepConfirm } from './StepConfirm'
 import { IdentityGate } from '@/components/customer/IdentityGate'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency } from '@/lib/utils'
 import { toast } from '@/components/ui/use-toast'
@@ -21,6 +20,29 @@ function Row({ label, value }: { label: string; value: string }) {
 
 export function CustomerSnapshotStep({ customer }: { customer: Customer }) {
   const { state, dispatch } = useWorkspace()
+
+  useRegisterIslandActions(
+    () => ({
+      stepId: 'customer_snapshot',
+      title: state.identityVerified ? 'Profile confirmed' : 'Verify the customer',
+      hint: state.identityVerified
+        ? 'Continue to capture the rollover goal'
+        : 'Confirm the customer’s identity to continue',
+      actions: state.identityVerified
+        ? [
+            {
+              id: 'continue',
+              label: 'Continue to Goal & Eligibility',
+              primary: true,
+              icon: ArrowRight,
+              onClick: () =>
+                dispatch({ type: 'SELECT_STEP', step: 'goal_eligibility' }),
+            },
+          ]
+        : [],
+    }),
+    [state.identityVerified],
+  )
 
   return (
     <div className="flex flex-1 flex-col space-y-5">
@@ -153,21 +175,6 @@ export function CustomerSnapshotStep({ customer }: { customer: Customer }) {
             </Card>
           </div>
 
-          <StepConfirm
-            icon={ShieldCheck}
-            title="Identity verified — profile confirmed"
-            description={`You're viewing ${customer.name} (${customer.customer_id}). Continue to capture the rollover goal — the eligibility check then runs automatically.`}
-            actions={
-              <Button
-                onClick={() =>
-                  dispatch({ type: 'SELECT_STEP', step: 'goal_eligibility' })
-                }
-              >
-                Continue to Goal &amp; Eligibility
-                <ArrowRight />
-              </Button>
-            }
-          />
         </>
       )}
     </div>

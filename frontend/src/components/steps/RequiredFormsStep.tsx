@@ -10,12 +10,12 @@ import {
 } from 'lucide-react'
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { useSimulatedAgentRun } from '@/hooks/useSimulatedAgentRun'
+import { useRegisterIslandActions } from '@/lib/island-store'
 import { StepHeader } from './StepHeader'
 import { StepConfirm } from './StepConfirm'
 import { MissingInformationCard } from '@/components/eligibility/MissingInformationCard'
 import { FormUploadCard } from '@/components/forms/FormUploadCard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 
 export function RequiredFormsStep() {
   const { state, dispatch } = useWorkspace()
@@ -48,6 +48,41 @@ export function RequiredFormsStep() {
       doneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
     }
   }, [hasRun])
+
+  useRegisterIslandActions(
+    () => ({
+      stepId: 'required_forms',
+      title: !hasRun
+        ? 'Required forms'
+        : allClear
+          ? 'Forms ready'
+          : hasIssues
+            ? 'Forms need fixes'
+            : 'Items outstanding',
+      hint: 'Continue to the compliance review',
+      actions: hasRun
+        ? [
+            {
+              id: 'continue',
+              label: 'Continue to Compliance Review',
+              primary: true,
+              icon: ArrowRight,
+              onClick: () =>
+                dispatch({ type: 'SELECT_STEP', step: 'compliance_review' }),
+            },
+            {
+              id: 'recheck',
+              label: 'Re-check forms',
+              variant: 'outline',
+              icon: FileSearch,
+              disabled: runningAction !== null,
+              onClick: () => run('forms'),
+            },
+          ]
+        : [],
+    }),
+    [hasRun, allClear, hasIssues, runningAction],
+  )
 
   return (
     <div className="flex flex-1 flex-col space-y-5">
@@ -127,30 +162,6 @@ export function RequiredFormsStep() {
                 : hasIssues
                   ? 'The AI review found problems in one or more uploaded forms — see the comments above. You can still continue and resolve them during compliance review.'
                   : 'The checklist is built. Upload the outstanding documents here, or continue and resolve them later.'
-            }
-            actions={
-              <>
-                <Button
-                  onClick={() =>
-                    dispatch({ type: 'SELECT_STEP', step: 'compliance_review' })
-                  }
-                >
-                  Continue to Compliance Review
-                  <ArrowRight />
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={runningAction !== null}
-                  onClick={() => run('forms')}
-                >
-                  {finding ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <FileSearch />
-                  )}
-                  Re-check forms
-                </Button>
-              </>
             }
           >
             {!allClear && outstanding.length > 0 && (

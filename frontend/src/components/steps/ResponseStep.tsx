@@ -8,10 +8,10 @@ import {
   PenLine,
 } from 'lucide-react'
 import { useWorkspace } from '@/state/WorkspaceContext'
+import { useRegisterIslandActions } from '@/lib/island-store'
 import { StepHeader } from './StepHeader'
 import { StepConfirm } from './StepConfirm'
 import { ResponseEditor } from '@/components/response/ResponseEditor'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
@@ -57,6 +57,36 @@ export function ResponseStep() {
   const docNeeded = escalation
   const canContinue =
     hasDraft && state.responseApproved && (!docNeeded || state.complianceDocApproved)
+
+  useRegisterIslandActions(
+    () => ({
+      stepId: 'response',
+      title: canContinue ? 'Response approved' : 'Review & approve',
+      hint: canContinue
+        ? 'Continue to the final review'
+        : docNeeded
+          ? 'Approve the response and the attached report'
+          : 'Approve the response to continue',
+      actions: [
+        {
+          id: 'continue',
+          label: 'Continue to Review',
+          primary: true,
+          icon: ArrowRight,
+          disabled: !canContinue,
+          onClick: () => {
+            dispatch({
+              type: 'SET_STEP_STATUS',
+              step: 'response',
+              status: 'complete',
+            })
+            dispatch({ type: 'SELECT_STEP', step: 'review' })
+          },
+        },
+      ],
+    }),
+    [canContinue, docNeeded],
+  )
 
   return (
     <div className="flex flex-1 flex-col space-y-5">
@@ -140,22 +170,6 @@ export function ResponseStep() {
               : docNeeded
                 ? 'Approve the response and the attached compliance report to continue.'
                 : 'Approve the response above to continue to the final review.'
-          }
-          actions={
-            <Button
-              disabled={!canContinue}
-              onClick={() => {
-                dispatch({
-                  type: 'SET_STEP_STATUS',
-                  step: 'response',
-                  status: 'complete',
-                })
-                dispatch({ type: 'SELECT_STEP', step: 'review' })
-              }}
-            >
-              Continue to Review
-              <ArrowRight />
-            </Button>
           }
         />
       )}

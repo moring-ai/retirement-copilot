@@ -13,12 +13,12 @@ import {
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useWorkspace } from '@/state/WorkspaceContext'
+import { useRegisterIslandActions } from '@/lib/island-store'
 import { CUSTOMERS } from '@/data/customers'
 import { goalLabel } from '@/data/goals'
 import { StepHeader } from './StepHeader'
 import { StepConfirm } from './StepConfirm'
 import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toast } from '@/components/ui/use-toast'
 import { cn } from '@/lib/utils'
@@ -86,6 +86,42 @@ export function ReviewStep() {
       description: `${state.activeCaseId ?? customer.customer_id} sent to a retirement servicing reviewer.`,
     })
   }
+
+  useRegisterIslandActions(
+    () => ({
+      stepId: 'review',
+      title: submitted
+        ? 'Submitted'
+        : ready
+          ? 'Ready to submit'
+          : 'Complete the case',
+      hint: submitted
+        ? 'Sent to a reviewer'
+        : 'Submit this case for a reviewer',
+      actions: submitted
+        ? [
+            {
+              id: 'home',
+              label: 'Back to Cases',
+              primary: true,
+              variant: 'outline',
+              icon: Home,
+              onClick: () => dispatch({ type: 'GO_HOME' }),
+            },
+          ]
+        : [
+            {
+              id: 'submit',
+              label: 'Submit to Review',
+              primary: true,
+              icon: Send,
+              disabled: !ready,
+              onClick: submit,
+            },
+          ],
+    }),
+    [submitted, ready],
+  )
 
   return (
     <div className="flex flex-1 flex-col space-y-5">
@@ -197,19 +233,6 @@ export function ReviewStep() {
             : ready
               ? 'Everything checks out. Submit this case for a reviewer.'
               : 'Identity, goal, eligibility, and an approved response are required before submitting.'
-        }
-        actions={
-          submitted ? (
-            <Button variant="outline" onClick={() => dispatch({ type: 'GO_HOME' })}>
-              <Home />
-              Back to Cases
-            </Button>
-          ) : (
-            <Button disabled={!ready} onClick={submit}>
-              <Send />
-              Submit to Review
-            </Button>
-          )
         }
       />
     </div>

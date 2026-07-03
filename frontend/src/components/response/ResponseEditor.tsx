@@ -8,6 +8,8 @@ import {
   Loader2,
   Wand2,
   SendHorizonal,
+  Info,
+  CheckCircle2,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -15,9 +17,25 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from '@/components/ui/popover'
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { useSimulatedAgentRun } from '@/hooks/useSimulatedAgentRun'
 import { toast } from '@/components/ui/use-toast'
+
+// The deterministic, code-only guardrails the agent works within — surfaced
+// here as an info popover (same content the compliance step enforces).
+const GUARDRAILS = [
+  'No personalized investment advice',
+  'No unsupported tax or legal advice',
+  'No trade execution or money movement',
+  'Customer PII redacted from the draft',
+]
+
+const REWRITE_PRESETS = ['More concise', 'More explanatory', 'Warmer', 'More formal']
 
 /** Apply the associate's plain-language rewrite instruction to the draft. */
 function rewrite(current: string, direction: string): string {
@@ -26,6 +44,13 @@ function rewrite(current: string, direction: string): string {
   if (/short|concise|brief|trim/.test(d)) {
     const paras = current.split('\n\n')
     return [paras[0], paras[1], paras[paras.length - 1]].filter(Boolean).join('\n\n') + note
+  }
+  if (/explan|detail|thorough|elaborat/.test(d)) {
+    return (
+      current +
+      '\n\nHappy to expand on any part: your former plan sends the funds directly to Fidelity, we deposit them into your new IRA, and you receive written confirmation at each step. Reach out any time and we can walk through it together.' +
+      note
+    )
   }
   if (/warm|friendl|personal|empath/.test(d)) {
     return current.replace(
@@ -60,16 +85,20 @@ export function ResponseEditor() {
     }
   }, [complianceReady, hasDraft, runningAction, run])
 
-  const doRewrite = () => {
-    if (!direction.trim()) return
+  const doRewrite = (preset?: string) => {
+    const instruction = (preset ?? direction).trim()
+    if (!instruction) return
     setRewriting(true)
-    const instruction = direction
     window.setTimeout(() => {
       dispatch({ type: 'SET_DRAFT_TEXT', text: rewrite(state.draftText, instruction) })
       dispatch({ type: 'SET_RESPONSE_APPROVED', approved: false })
       setRewriting(false)
       setDirection('')
-      toast({ variant: 'info', title: 'Response rewritten', description: 'Draft updated with your direction.' })
+      toast({
+        variant: 'info',
+        title: 'Response rewritten',
+        description: `Draft updated: “${instruction}”.`,
+      })
     }, 1200)
   }
 
@@ -88,30 +117,57 @@ export function ResponseEditor() {
               </Badge>
             </div>
           </div>
-          {hasDraft && (
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  navigator.clipboard?.writeText(state.draftText)
-                  toast({ variant: 'info', title: 'Response copied to clipboard' })
-                }}
-              >
-                <Copy />
-                Copy
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={runningAction !== null || rewriting}
-                onClick={() => run('draft')}
-              >
-                <RefreshCw />
-                Regenerate
-              </Button>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger className="flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-ink-soft transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <Info className="h-3.5 w-3.5 text-secondary" />
+                Guardrails
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80">
+                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                  <ShieldCheck className="h-3.5 w-3.5 text-brand" />
+                  How the AI is bounded
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Deterministic, code-only checks run on every response — the
+                  model cannot argue past them.
+                </p>
+                <ul className="mt-3 space-y-1.5">
+                  {GUARDRAILS.map((g) => (
+                    <li key={g} className="flex items-center gap-2 text-sm text-ink">
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-brand" />
+                      {g}
+                    </li>
+                  ))}
+                </ul>
+              </PopoverContent>
+            </Popover>
+
+            {hasDraft && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(state.draftText)
+                    toast({ variant: 'info', title: 'Response copied to clipboard' })
+                  }}
+                >
+                  <Copy />
+                  Copy
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={runningAction !== null || rewriting}
+                  onClick={() => run('draft')}
+                >
+                  <RefreshCw />
+                  Regenerate
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </CardHeader>
 
@@ -163,15 +219,28 @@ export function ResponseEditor() {
               <Wand2 className="h-3.5 w-3.5 text-secondary" />
               Direct the AI
             </p>
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {REWRITE_PRESETS.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  disabled={rewriting}
+                  onClick={() => doRewrite(p)}
+                  className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-ink-soft transition-colors hover:border-secondary/40 hover:bg-muted disabled:opacity-50"
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
             <div className="flex gap-2">
               <Input
                 value={direction}
                 onChange={(e) => setDirection(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && doRewrite()}
-                placeholder="e.g. make it warmer, shorter, more formal…"
+                placeholder="Or type your own: make it warmer, shorter, more formal…"
                 disabled={rewriting}
               />
-              <Button onClick={doRewrite} disabled={rewriting || !direction.trim()}>
+              <Button onClick={() => doRewrite()} disabled={rewriting || !direction.trim()}>
                 {rewriting ? <Loader2 className="animate-spin" /> : <SendHorizonal />}
                 Rewrite
               </Button>
