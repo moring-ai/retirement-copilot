@@ -1,0 +1,14 @@
+# Keep the build context small — backend/mcp images don't need these.
+frontend
+agentcore
+docs
+.git
+.venv
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.DS_Store
+*.md
+.env
+dist
+node_modules

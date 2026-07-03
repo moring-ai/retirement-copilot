@@ -17,5 +17,45 @@ services:
       timeout: 5s
       retries: 10
 
+  mcp:
+    build:
+      context: .
+      dockerfile: mcp_server/Dockerfile
+    container_name: retirement-copilot-mcp
+    environment:
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: "8100"
+    ports:
+      - "8100:8100"   # exposed for convenience; the backend reaches it in-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: retirement-copilot-backend
+    environment:
+      # In-network addresses (not the host-published ports).
+      DATABASE_URL: postgresql://copilot:copilot@postgres:5432/retirement_copilot
+      MCP_SERVER_URL: http://mcp:8100/mcp
+      # LLM: leave OPENAI_API_KEY empty to use the deterministic offline fallback.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      AGENT_MODEL: ${AGENT_MODEL:-gpt-4o-mini}
+    ports:
+      - "8088:8080"   # host 8088 (8080 is taken by another project); frontend uses VITE_BACKEND_URL
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mcp:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/health').status==200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    restart: unless-stopped
+
 volumes:
   pgdata:
