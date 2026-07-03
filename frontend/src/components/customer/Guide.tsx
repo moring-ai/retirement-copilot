@@ -1,5 +1,5 @@
 import { Loader2, ArrowRight, BookOpen } from 'lucide-react'
-import { FidelityLogo } from '@/components/brand/FidelityLogo'
+import { CustomerShell } from './CustomerShell'
 import type { CustomerState } from './customerMachine'
 
 /** Path B — the impersonal "general guide". No customer, no personal facts;
@@ -19,9 +19,8 @@ export function Guide({
   const contentSkills = (r?.skills_used ?? []).filter((s) => s.kind === 'content')
 
   return (
-    <div className="paper min-h-screen">
-      <div className="mx-auto w-full max-w-2xl px-5 py-12">
-        <FidelityLogo size={26} className="mb-6" />
+    <CustomerShell>
+      <div>
         <button
           type="button"
           onClick={onBack}
@@ -108,6 +107,6 @@ export function Guide({
           </div>
         )}
       </div>
-    </div>
+    </CustomerShell>
   )
 }

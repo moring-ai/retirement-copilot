@@ -14,7 +14,7 @@ import {
   type Action,
 } from '@/state/workspace-reducer'
 import { useAgentBus } from '@/hooks/useAgentBus'
-import { publish } from '@/lib/agentBus'
+import { publish, getPersistedRuns } from '@/lib/agentBus'
 import { CURRENT_ASSOCIATE } from '@/data/cases'
 
 interface WorkspaceContextValue {
@@ -42,6 +42,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 function WorkspaceBusBridge() {
   const { state, dispatch } = useWorkspace()
   const stamped = useRef<Set<string>>(new Set())
+
+  // Catch up on any customer runs that happened before this tab opened/reloaded
+  // (BroadcastChannel has no replay). Ingest is idempotent (upsert by case id).
+  useEffect(() => {
+    getPersistedRuns().forEach((run) => dispatch({ type: 'INGEST_AGENT_RUN', run }))
+  }, [dispatch])
 
   useAgentBus((e) => {
     if (e.type === 'AGENT_RUN') dispatch({ type: 'INGEST_AGENT_RUN', run: e })

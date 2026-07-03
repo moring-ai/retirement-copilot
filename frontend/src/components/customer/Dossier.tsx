@@ -9,10 +9,17 @@ import {
   ShieldCheck,
   AlertTriangle,
   UserCheck,
+  UserRound,
+  FileText,
+  PenLine,
+  UserCog,
 } from 'lucide-react'
 import type { Dispatch } from 'react'
 import { CUSTOMERS } from '@/data/customers'
-import { FidelityLogo } from '@/components/brand/FidelityLogo'
+import { cn } from '@/lib/utils'
+import { CustomerShell } from './CustomerShell'
+import { DossierProgress, type ProgressStep } from './DossierProgress'
+import { AgentActivityRail } from './AgentActivityRail'
 import type { ChatResponse } from '@/lib/chatContract'
 import type { CustomerAction, CustomerState } from './customerMachine'
 
@@ -135,79 +142,76 @@ export function Dossier({
   else if (showPlan && !state.saved) gutter = 'Writing your plan of action.'
   else if (state.saved) gutter = 'Your dossier is ready.'
 
-  const rail = [
-    { label: 'About you', done: showVerdict, current: showFacts && !showVerdict },
-    { label: 'Your old plan', done: state.planConfirmed, current: showFacts && !state.planConfirmed },
-    {
-      label: 'Whether you can roll over',
-      done: escalation ? showHandoff : state.movementChoice != null,
-      current: showVerdict && !escalation && state.movementChoice == null,
-    },
-    escalation
-      ? { label: 'A specialist review', done: showHandoff, current: showHandoff }
-      : { label: "What we'll need", done: state.formsAcknowledged, current: showForms && !state.formsAcknowledged },
-    escalation
-      ? { label: 'Your copy', done: showHandoff, current: false }
-      : { label: 'Your plan of action', done: state.saved, current: showPlan && !state.saved },
-  ]
+  const progressSteps: ProgressStep[] = escalation
+    ? [
+        { label: 'Your details', icon: UserRound, state: state.planConfirmed ? 'done' : showFacts ? 'current' : 'todo' },
+        { label: 'Eligibility', icon: ShieldCheck, state: showHandoff ? 'done' : showVerdict ? 'current' : 'todo' },
+        { label: 'Specialist review', icon: UserCog, state: showHandoff ? 'current' : 'todo' },
+      ]
+    : [
+        { label: 'Your details', icon: UserRound, state: state.planConfirmed ? 'done' : showFacts ? 'current' : 'todo' },
+        { label: 'Eligibility', icon: ShieldCheck, state: state.movementChoice != null ? 'done' : showVerdict ? 'current' : 'todo' },
+        { label: 'Paperwork', icon: FileText, state: state.formsAcknowledged ? 'done' : showForms ? 'current' : 'todo' },
+        { label: 'Your plan', icon: PenLine, state: state.saved ? 'done' : showPlan ? 'current' : 'todo' },
+      ]
 
   return (
-    <div className="paper min-h-screen">
-      <div className="mx-auto w-full max-w-3xl px-5 py-10">
-        <FidelityLogo size={26} className="mb-6" />
-        {/* Ribbon: Path A legibility, no jargon */}
+    <CustomerShell
+      bar={<DossierProgress steps={progressSteps} />}
+      right={<AgentActivityRail state={state} />}
+    >
+      {/* Hero */}
+      <div className="mb-6">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e7f3ec] px-2.5 py-1 text-[11px] font-medium text-[#0a5c3b]">
           <UserCheck className="h-3.5 w-3.5" /> written using your account details
         </span>
-
-        <h1 className="paper-serif mt-3 text-[30px] leading-tight text-[color:var(--paper-ink)]">
+        <h1 className="paper-serif mt-3 text-[32px] leading-tight text-[color:var(--paper-ink)]">
           Your rollover dossier
         </h1>
-        <p className="text-sm text-[color:var(--paper-ink-soft)]">
-          prepared for {customer.name}
-        </p>
+        <p className="text-sm text-[color:var(--paper-ink-soft)]">prepared for {customer.name}</p>
 
-        {/* activity gutter */}
-        <div className="mt-3 flex items-center gap-2 text-[13px] italic text-[color:var(--paper-ink-soft)]">
+        <div className="mt-2.5 flex items-center gap-2 text-[13px] italic text-[color:var(--paper-ink-soft)]">
           {!ready && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           <span className="paper-serif">{gutter}</span>
         </div>
 
-        <hr className="paper-rule my-7" />
+        {/* account flow + eligibility status */}
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <div className="rounded-xl border border-[color:var(--paper-rule)] bg-[color:var(--paper-card)] px-3.5 py-2.5">
+            <p className="text-[10px] uppercase tracking-wide text-[color:var(--paper-muted)]">From</p>
+            <p className="text-sm font-medium text-[color:var(--paper-ink)]">{customer.source_plan.plan_type}</p>
+            <p className="text-[11px] text-[color:var(--paper-ink-soft)]">{customer.source_plan.plan_provider}</p>
+          </div>
+          <ArrowRight className="h-4 w-4 text-[color:var(--paper-muted)]" />
+          <div className="rounded-xl border border-[#0b7a4e]/20 bg-[#e7f3ec] px-3.5 py-2.5">
+            <p className="text-[10px] uppercase tracking-wide text-[#0a5c3b]/70">To</p>
+            <p className="text-sm font-medium text-[#0a5c3b]">{customer.destination_account}</p>
+            <p className="text-[11px] text-[#0a5c3b]/70">Fidelity</p>
+          </div>
+          {showVerdict && (
+            <span
+              className={cn(
+                'ml-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium',
+                escalation ? 'bg-[#fbeeda] text-[#c2760b]' : 'bg-[#e7f3ec] text-[#0a5c3b]',
+              )}
+            >
+              {escalation ? <AlertTriangle className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
+              {escalation ? 'Specialist review' : 'Eligible · direct rollover'}
+            </span>
+          )}
+        </div>
+      </div>
 
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-[150px_1fr]">
-          {/* margin rail */}
-          <nav className="hidden flex-col gap-3 text-[13px] sm:flex">
-            {rail.map((it) => (
-              <div
-                key={it.label}
-                className={
-                  it.current
-                    ? 'text-[color:var(--paper-ink)]'
-                    : 'text-[color:var(--paper-ink-soft)]'
-                }
-              >
-                <span
-                  className={
-                    it.done ? 'text-[#0b7a4e]' : it.current ? 'text-[#0b7a4e]' : 'text-[color:var(--paper-muted)]'
-                  }
-                >
-                  {it.done ? '✓' : it.current ? '✎' : '○'}
-                </span>{' '}
-                {it.label}
-              </div>
-            ))}
-          </nav>
-
-          {/* the composed document */}
-          <div className="min-w-0 space-y-7">
-            {!showFacts && (
-              <div className="space-y-3">
-                <div className="h-3 w-1/3 rounded bg-[color:var(--paper-rule)]" />
-                <div className="h-3 w-2/3 rounded bg-[color:var(--paper-rule)]" />
-                <div className="h-3 w-1/2 rounded bg-[color:var(--paper-rule)]" />
-              </div>
-            )}
+      {/* the composed document */}
+      <div className="paper-card space-y-7 rounded-2xl p-6 shadow-soft sm:p-7">
+        {!showFacts && (
+          <div className="space-y-3">
+            <div className="shimmer h-3.5 w-1/3 rounded bg-[color:var(--paper-rule)]" />
+            <div className="shimmer h-3.5 w-2/3 rounded bg-[color:var(--paper-rule)]" />
+            <div className="shimmer h-3.5 w-1/2 rounded bg-[color:var(--paper-rule)]" />
+            <div className="shimmer h-3.5 w-4/5 rounded bg-[color:var(--paper-rule)]" />
+          </div>
+        )}
 
             {showFacts && (
               <>
@@ -399,24 +403,8 @@ export function Dossier({
               </>
             )}
 
-            {/* associate review stamps (reverse channel) */}
-            {state.stamps.length > 0 && (
-              <div className="ink-in border-t border-[color:var(--paper-rule)] pt-4">
-                {state.stamps.map((s, i) => (
-                  <p
-                    key={i}
-                    className="flex items-center gap-1.5 text-[12px] text-[color:var(--paper-muted)]"
-                  >
-                    <ShieldCheck className="h-3.5 w-3.5 text-[#0b7a4e]" />
-                    {s.label} · {s.associate}
-                  </p>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
       </div>
-    </div>
+    </CustomerShell>
   )
 }
 

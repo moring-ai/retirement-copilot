@@ -1,5 +1,14 @@
 import { useState } from 'react'
-import { ArrowRight, BookOpen, CalendarDays, ShieldCheck, UserRound } from 'lucide-react'
+import {
+  ArrowRight,
+  BookOpen,
+  BookMarked,
+  CalendarDays,
+  Landmark,
+  Lock,
+  ShieldCheck,
+  UserRound,
+} from 'lucide-react'
 import { CUSTOMERS, CUSTOMER_LIST } from '@/data/customers'
 import { FidelityLogo, FidelityWatermark } from '@/components/brand/FidelityLogo'
 import { GUIDE_TOPICS, type GuideTopic } from './customerMachine'
@@ -62,20 +71,26 @@ export function Cover({
                       setPicked(id)
                       setError(null)
                     }}
-                    className="paper-card group flex items-center gap-3 rounded-xl p-4 text-left transition-transform hover:-translate-y-0.5"
+                    className="paper-card group rounded-2xl p-4 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:border-[#0b7a4e]/30"
                   >
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e7f3ec] text-[#0b7a4e]">
-                      <UserRound className="h-5 w-5" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium text-[color:var(--paper-ink)]">
-                        {c.name}
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e7f3ec] font-semibold text-[#0b7a4e]">
+                        {c.name.split(' ').map((p) => p[0]).join('')}
                       </span>
-                      <span className="block truncate text-xs text-[color:var(--paper-ink-soft)]">
-                        {c.employment_status} · {c.state}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium text-[color:var(--paper-ink)]">
+                          {c.name}
+                        </span>
+                        <span className="block truncate text-xs text-[color:var(--paper-ink-soft)]">
+                          {c.employment_status} · {c.state}
+                        </span>
                       </span>
-                    </span>
-                    <ArrowRight className="ml-auto h-4 w-4 text-[color:var(--paper-muted)] transition-transform group-hover:translate-x-0.5" />
+                      <ArrowRight className="h-4 w-4 text-[color:var(--paper-muted)] transition-transform group-hover:translate-x-0.5" />
+                    </div>
+                    <div className="mt-3 flex items-center gap-2 border-t border-[color:var(--paper-rule)] pt-2.5 text-[11px] text-[color:var(--paper-ink-soft)]">
+                      <Landmark className="h-3.5 w-3.5 text-[color:var(--paper-muted)]" />
+                      {c.source_plan.plan_type} · {c.source_plan.plan_provider}
+                    </div>
                   </button>
                 )
               })}
@@ -110,6 +125,27 @@ export function Cover({
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* trust row */}
+            <div className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {[
+                { icon: BookMarked, t: 'Grounded in Fidelity’s approved policy' },
+                { icon: UserRound, t: 'A specialist reviews everything' },
+                { icon: Lock, t: 'Your details stay protected' },
+              ].map((b) => (
+                <div
+                  key={b.t}
+                  className="flex items-start gap-2.5 rounded-xl border border-[color:var(--paper-rule)] bg-[color:var(--paper-card)]/60 p-3"
+                >
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#e7f3ec] text-[#0b7a4e]">
+                    <b.icon className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="text-[12px] leading-snug text-[color:var(--paper-ink-soft)]">
+                    {b.t}
+                  </span>
+                </div>
+              ))}
             </div>
           </>
         ) : (
