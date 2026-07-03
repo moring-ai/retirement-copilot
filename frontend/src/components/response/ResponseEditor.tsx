@@ -72,18 +72,18 @@ export function ResponseEditor() {
   const [direction, setDirection] = useState('')
   const [rewriting, setRewriting] = useState(false)
 
-  const complianceReady =
-    state.stepStatuses.compliance_review === 'complete' ||
-    state.stepStatuses.compliance_review === 'needs_info'
+  const formsReady =
+    state.stepStatuses.required_forms === 'complete' ||
+    state.stepStatuses.required_forms === 'needs_info'
 
   // Autopilot: the agent drafts the response on arrival; the associate then
-  // reviews and approves it (this step never auto-advances). Guarded on state
-  // (not a ref) so it is StrictMode-safe.
+  // reviews and approves it. Guarded on state (not a ref) so it is
+  // StrictMode-safe.
   useEffect(() => {
-    if (complianceReady && !hasDraft && runningAction === null) {
+    if (formsReady && !hasDraft && runningAction === null) {
       run('draft')
     }
-  }, [complianceReady, hasDraft, runningAction, run])
+  }, [formsReady, hasDraft, runningAction, run])
 
   const doRewrite = (preset?: string) => {
     const instruction = (preset ?? direction).trim()
@@ -203,7 +203,7 @@ export function ResponseEditor() {
               your review.
             </p>
             <Button
-              disabled={runningAction !== null || !complianceReady}
+              disabled={runningAction !== null || !formsReady}
               onClick={() => run('draft')}
             >
               {generating ? <Loader2 className="animate-spin" /> : <Sparkles />}

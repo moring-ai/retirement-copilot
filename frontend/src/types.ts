@@ -23,12 +23,11 @@ export type StepId =
   | 'customer_snapshot'
   | 'goal_eligibility'
   | 'required_forms'
-  | 'compliance_review'
   | 'response'
   | 'review'
 
 /** Which of the agent actions is currently simulating. */
-export type RunningAction = 'eligibility' | 'forms' | 'compliance' | 'draft' | null
+export type RunningAction = 'eligibility' | 'forms' | 'draft' | null
 
 // ---------------------------------------------------------------------------
 // Customer record (mirrors mock_customers.json)

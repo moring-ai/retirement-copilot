@@ -6,7 +6,6 @@ import {
   X,
   Wrench,
   Puzzle,
-  Activity,
   CircleCheck,
   Ban,
   Clock3,
@@ -14,7 +13,6 @@ import {
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { useIslandSpec, type IslandAction } from '@/lib/island-store'
 import { deriveSkills } from '@/lib/agentSkills'
-import { TimelineEntry } from '@/components/evidence/TimelineEntry'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -131,20 +129,6 @@ export function AgentIsland() {
                       </span>
                     ))}
                   </div>
-                )}
-              </section>
-
-              {/* Trace */}
-              <section>
-                <SectionLabel icon={Activity} label="Trace" count={timeline.length} />
-                {timeline.length === 0 ? (
-                  <p className="mt-1 text-xs text-muted-foreground">No activity yet.</p>
-                ) : (
-                  <ol className="mt-2 space-y-3">
-                    {timeline.map((e, i) => (
-                      <TimelineEntry key={e.id} event={e} last={i === timeline.length - 1} />
-                    ))}
-                  </ol>
                 )}
               </section>
             </div>

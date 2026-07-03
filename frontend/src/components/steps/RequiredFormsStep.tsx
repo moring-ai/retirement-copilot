@@ -59,16 +59,16 @@ export function RequiredFormsStep() {
           : hasIssues
             ? 'Forms need fixes'
             : 'Items outstanding',
-      hint: 'Continue to the compliance review',
+      hint: 'Continue to draft the response',
       actions: hasRun
         ? [
             {
               id: 'continue',
-              label: 'Continue to Compliance Review',
+              label: 'Continue to Response',
               primary: true,
               icon: ArrowRight,
               onClick: () =>
-                dispatch({ type: 'SELECT_STEP', step: 'compliance_review' }),
+                dispatch({ type: 'SELECT_STEP', step: 'response' }),
             },
             {
               id: 'recheck',
@@ -158,9 +158,9 @@ export function RequiredFormsStep() {
             }
             description={
               allClear
-                ? 'Everything the agent flagged for this rollover is accounted for. Ready to move on to the compliance review?'
+                ? 'Everything the agent flagged for this rollover is accounted for. Ready to draft the response?'
                 : hasIssues
-                  ? 'The AI review found problems in one or more uploaded forms — see the comments above. You can still continue and resolve them during compliance review.'
+                  ? 'The AI review found problems in one or more uploaded forms — see the comments above. You can still continue and resolve them before sending.'
                   : 'The checklist is built. Upload the outstanding documents here, or continue and resolve them later.'
             }
           >

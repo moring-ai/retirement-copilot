@@ -33,7 +33,7 @@ export function seedCases(now: number): CaseSummary[] {
       stage: 'escalated',
       priority: 'high',
       assignee: 'Dana Rivera',
-      currentStep: 'compliance_review',
+      currentStep: 'response',
       progressPct: 66,
       lastUpdatedBy: 'Dana Rivera',
       lastUpdatedAt: now - 3 * HOUR,

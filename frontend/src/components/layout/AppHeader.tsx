@@ -2,7 +2,6 @@ import { Save, FileDown, ArrowLeft, Clock3 } from 'lucide-react'
 import { FidelityMark } from '@/components/brand/FidelityLogo'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/use-toast'
-import { EvidenceDrawerToggle } from './EvidenceDrawerToggle'
 import { NotificationsMenu } from './NotificationsMenu'
 import { ProfileMenu } from './ProfileMenu'
 import { StageBadge } from '@/components/home/StageBadge'
@@ -98,7 +97,6 @@ export function AppHeader() {
                 </Button>
               </div>
 
-              <EvidenceDrawerToggle />
               <span className="mx-1 hidden h-6 w-px bg-border lg:block" />
             </>
           )}

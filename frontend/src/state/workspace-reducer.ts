@@ -32,7 +32,6 @@ export const STEP_ORDER: StepId[] = [
   'customer_snapshot',
   'goal_eligibility',
   'required_forms',
-  'compliance_review',
   'response',
   'review',
 ]
@@ -41,7 +40,6 @@ export const STEP_LABELS: Record<StepId, string> = {
   customer_snapshot: 'Customer Snapshot',
   goal_eligibility: 'Goal & Eligibility',
   required_forms: 'Required Forms',
-  compliance_review: 'Compliance Review',
   response: 'Response',
   review: 'Review',
 }
@@ -51,7 +49,6 @@ export const STEP_SHORT: Record<StepId, string> = {
   customer_snapshot: 'Snapshot',
   goal_eligibility: 'Goal & Eligibility',
   required_forms: 'Forms',
-  compliance_review: 'Compliance',
   response: 'Response',
   review: 'Review',
 }
@@ -139,7 +136,6 @@ function emptyStatuses(): Record<StepId, StepStatus> {
     customer_snapshot: 'pending',
     goal_eligibility: 'pending',
     required_forms: 'pending',
-    compliance_review: 'pending',
     response: 'pending',
     review: 'pending',
   }
@@ -293,15 +289,14 @@ function hydrateFromRun(customerId: string, r: ChatResponse): Partial<WorkingSta
   const escalation = r.escalation_required
   const statuses: Record<StepId, StepStatus> = {
     customer_snapshot: 'complete',
-    goal_eligibility: 'complete',
+    goal_eligibility: escalation ? 'needs_info' : 'complete',
     required_forms: 'complete',
-    compliance_review: escalation ? 'needs_info' : 'complete',
     response: escalation ? 'pending' : 'complete',
     review: escalation ? 'pending' : 'in_progress',
   }
   return {
     activeCustomerId: customerId,
-    activeStep: escalation ? 'compliance_review' : 'review',
+    activeStep: escalation ? 'goal_eligibility' : 'review',
     stepStatuses: statuses,
     identityVerified: true,
     selectedGoalId: 'direct_traditional',
@@ -754,7 +749,7 @@ export function workspaceReducer(
         stage: escalation ? 'escalated' : 'in_review',
         priority: escalation ? 'high' : 'medium',
         assignee: CURRENT_ASSOCIATE,
-        currentStep: escalation ? 'compliance_review' : 'response',
+        currentStep: escalation ? 'goal_eligibility' : 'response',
         progressPct: escalation ? 66 : 83,
         lastUpdatedBy: `${run.customerName} (online)`,
         lastUpdatedAt: t,

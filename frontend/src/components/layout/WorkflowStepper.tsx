@@ -2,7 +2,6 @@ import {
   User,
   Target,
   FileText,
-  ScrollText,
   PenLine,
   BadgeCheck,
   Check,
@@ -17,7 +16,6 @@ const STEP_ICONS: Record<StepId, LucideIcon> = {
   customer_snapshot: User,
   goal_eligibility: Target,
   required_forms: FileText,
-  compliance_review: ScrollText,
   response: PenLine,
   review: BadgeCheck,
 }

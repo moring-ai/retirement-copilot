@@ -3,7 +3,6 @@ import { CUSTOMERS } from '@/data/customers'
 import { CustomerSnapshotStep } from './CustomerSnapshotStep'
 import { GoalEligibilityStep } from './GoalEligibilityStep'
 import { RequiredFormsStep } from './RequiredFormsStep'
-import { ComplianceReviewStep } from './ComplianceReviewStep'
 import { ResponseStep } from './ResponseStep'
 import { ReviewStep } from './ReviewStep'
 
@@ -18,8 +17,6 @@ export function StepPanel() {
       return <GoalEligibilityStep customer={customer} />
     case 'required_forms':
       return <RequiredFormsStep />
-    case 'compliance_review':
-      return <ComplianceReviewStep />
     case 'response':
       return <ResponseStep />
     case 'review':

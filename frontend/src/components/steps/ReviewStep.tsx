@@ -5,7 +5,6 @@ import {
   ShieldAlert,
   FileText,
   CheckCircle2,
-  AlertTriangle,
   PenLine,
   Send,
   Home,
@@ -67,7 +66,6 @@ function KV({ k, v }: { k: string; v: string }) {
 export function ReviewStep() {
   const { state, dispatch } = useWorkspace()
   const customer = CUSTOMERS[state.activeCustomerId]
-  const escalation = state.stepStatuses.compliance_review === 'needs_info'
   const result = state.eligibilityResult
   const verifiedForms = state.uploadedForms.filter((f) => f.status === 'verified')
   const submitted = state.stepStatuses.review === 'complete'
@@ -185,22 +183,6 @@ export function ReviewStep() {
               />
             </>
           )}
-        </SummarySection>
-
-        <SummarySection
-          icon={escalation ? AlertTriangle : CheckCircle2}
-          title="Compliance"
-          tone={escalation ? 'warn' : 'brand'}
-        >
-          <div className="flex items-center gap-2">
-            <Badge variant={escalation ? 'warn' : 'default'}>
-              {escalation ? 'Escalation required' : 'Cleared'}
-            </Badge>
-            <span className="text-xs text-muted-foreground">
-              {state.complianceIssues.length} note
-              {state.complianceIssues.length === 1 ? '' : 's'}
-            </span>
-          </div>
         </SummarySection>
 
         <SummarySection icon={PenLine} title="Response">

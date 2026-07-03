@@ -14,14 +14,14 @@ export function deriveSkills(state: WorkspaceState): string[] {
   if (ev.sources.length > 0) skills.push('Approved-guidance retrieval (RAG)')
   if (ev.confidence !== null) skills.push('Confidence & risk scoring')
 
-  const complianceRan =
-    state.stepStatuses.compliance_review === 'complete' ||
-    state.stepStatuses.compliance_review === 'needs_info'
-  if (complianceRan || ev.complianceWarnings.length > 0) {
-    skills.push('PII redaction', 'Advice & tax boundaries', 'Escalation policy')
+  // When a customer response has been drafted, the code-only guardrails ran.
+  if (state.draftText.length > 0) {
+    skills.push(
+      'PII redaction',
+      'Advice & tax boundaries',
+      'Approved customer language',
+    )
   }
-
-  if (state.draftText.length > 0) skills.push('Approved customer language')
 
   return skills
 }
