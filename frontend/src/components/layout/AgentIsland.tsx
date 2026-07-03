@@ -24,23 +24,50 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
-const CONF: Record<ConfidenceLevel, { pct: number; fill: string; text: string }> = {
-  High: { pct: 92, fill: 'bg-brand', text: 'text-brand-dark' },
-  Medium: { pct: 60, fill: 'bg-warn', text: 'text-warn' },
-  Low: { pct: 28, fill: 'bg-danger', text: 'text-danger' },
+const CONF: Record<ConfidenceLevel, { pct: number; text: string }> = {
+  High: { pct: 92, text: 'text-brand-dark' },
+  Medium: { pct: 60, text: 'text-warn' },
+  Low: { pct: 28, text: 'text-danger' },
 }
 
-/** Battery-style confidence gauge shown inside the island. */
-function ConfidenceBattery({ level }: { level: ConfidenceLevel }) {
+/** Circular progress ring — the outer ring fills to the confidence level. */
+function ConfidenceRing({ level }: { level: ConfidenceLevel }) {
   const c = CONF[level]
+  const r = 10
+  const circ = 2 * Math.PI * r
+  const offset = circ * (1 - c.pct / 100)
   return (
-    <div className="hidden shrink-0 items-center gap-1.5 sm:flex" title={`Confidence: ${level}`}>
-      <span className="relative flex h-4 w-8 items-center rounded-[3px] border border-ink-soft/40 p-[2px]">
-        <span
-          className={cn('h-full rounded-[1px] transition-all duration-700', c.fill)}
-          style={{ width: `${c.pct}%` }}
-        />
-        <span className="absolute -right-[3px] top-1/2 h-1.5 w-[2px] -translate-y-1/2 rounded-r bg-ink-soft/40" />
+    <div
+      className="hidden shrink-0 items-center gap-1.5 sm:flex"
+      title={`Confidence: ${level} (${c.pct}%)`}
+    >
+      <span className="relative flex h-7 w-7 items-center justify-center">
+        <svg viewBox="0 0 28 28" className="h-7 w-7 -rotate-90">
+          <circle
+            cx="14"
+            cy="14"
+            r={r}
+            fill="none"
+            className="text-muted"
+            stroke="currentColor"
+            strokeWidth="3"
+          />
+          <circle
+            cx="14"
+            cy="14"
+            r={r}
+            fill="none"
+            className={cn('transition-all duration-700', c.text)}
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeDasharray={circ}
+            strokeDashoffset={offset}
+          />
+        </svg>
+        <span className={cn('absolute text-[9px] font-bold', c.text)}>
+          {c.pct}
+        </span>
       </span>
       <span className={cn('text-[11px] font-semibold', c.text)}>{level}</span>
     </div>
@@ -262,7 +289,7 @@ export function AgentIsland() {
             </p>
           </div>
 
-          {confidence && <ConfidenceBattery level={confidence} />}
+          {confidence && <ConfidenceRing level={confidence} />}
 
           {primary && !open && <ActionButton a={primary} />}
 
