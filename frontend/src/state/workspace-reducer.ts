@@ -294,12 +294,13 @@ function hydrateFromRun(customerId: string, r: ChatResponse): Partial<WorkingSta
     customer_snapshot: 'complete',
     goal_eligibility: escalation ? 'needs_info' : 'complete',
     required_forms: 'complete',
-    response: escalation ? 'pending' : 'complete',
-    review: escalation ? 'pending' : 'in_progress',
+    // Clean run stops at the drafted response for the associate's final approval.
+    response: escalation ? 'pending' : 'in_progress',
+    review: 'pending',
   }
   return {
     activeCustomerId: customerId,
-    activeStep: escalation ? 'goal_eligibility' : 'review',
+    activeStep: escalation ? 'goal_eligibility' : 'response',
     stepStatuses: statuses,
     identityVerified: true,
     selectedGoalId: 'direct_traditional',
@@ -350,6 +351,20 @@ function hydrateFromRun(customerId: string, r: ChatResponse): Partial<WorkingSta
       avoids: escalation ? [] : ['Mandatory 20% withholding', '60-day redeposit requirement'],
     },
     requiredForms: r.required_forms,
+    // A clean online run means the customer uploaded and we verified their
+    // paperwork — surface it in the associate's Required Forms step.
+    uploadedForms: escalation
+      ? []
+      : r.required_forms.map((f, i) => ({
+          id: `web-form-${i}`,
+          name: f,
+          sizeLabel: 'from customer',
+          status: 'verified' as const,
+          comments: [
+            '✓ Uploaded by the customer online.',
+            '✓ AI completeness check passed.',
+          ],
+        })),
     missingInformation: [],
     recommendedAction: escalation
       ? 'Do not initiate the rollover. Escalate for review of the flagged items.'
