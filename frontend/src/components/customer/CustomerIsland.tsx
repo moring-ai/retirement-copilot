@@ -45,6 +45,9 @@ export function CustomerIsland({
     ]
   } else if (escalation) {
     status = 'A specialist is reviewing your case — nothing needed from you.'
+    actions = [
+      { id: 'home', label: 'Back to home', primary: true, onClick: () => dispatch({ type: 'RESET' }) },
+    ]
   } else if (!state.movementChoice) {
     status = 'How would you like the money to move?'
     actions = [

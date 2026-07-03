@@ -70,11 +70,11 @@ function Footnote({ children }: { children: React.ReactNode }) {
 function Section({
   n,
   title,
-  writing,
   children,
 }: {
   n: number
   title: string
+  /** Retained for call-site compatibility; the blinking nib was removed. */
   writing?: boolean
   children: React.ReactNode
 }) {
@@ -85,7 +85,6 @@ function Section({
           {String(n).padStart(2, '0')}
         </span>
         <h2 className="paper-serif text-[19px] text-[color:var(--paper-ink)]">{title}</h2>
-        {writing && <span className="paper-nib ml-0.5" />}
       </div>
       <div className="mt-3 pl-6">{children}</div>
     </section>
