@@ -12,7 +12,6 @@ import type { StepId, StepStatus } from '@/types'
 import { useWorkspace } from '@/state/WorkspaceContext'
 import { STEP_ORDER, STEP_SHORT } from '@/state/workspace-reducer'
 import { cn } from '@/lib/utils'
-import { Progress } from '@/components/ui/progress'
 
 const STEP_ICONS: Record<StepId, LucideIcon> = {
   customer_snapshot: User,
@@ -30,79 +29,89 @@ const NODE_STYLE: Record<StepStatus, string> = {
   pending: 'bg-card text-muted-foreground border-border',
 }
 
+const N = STEP_ORDER.length
+// The connecting track runs between the first and last node centres, so it is
+// inset by half a column on each side.
+const INSET = 100 / (2 * N)
+const TRACK_WIDTH = 100 - 2 * INSET
+
 export function WorkflowStepper() {
   const { state, dispatch } = useWorkspace()
+
   const completed = STEP_ORDER.filter(
     (s) => state.stepStatuses[s] === 'complete',
   ).length
-  const pct = Math.round((completed / STEP_ORDER.length) * 100)
+
+  // A gap between node i and i+1 is "done" when node i is complete. Filling the
+  // track by done-gaps keeps the line and the node states in lock-step.
+  const doneGaps = STEP_ORDER.slice(0, N - 1).filter(
+    (s) => state.stepStatuses[s] === 'complete',
+  ).length
+  const fraction = doneGaps / (N - 1)
 
   return (
     <div className="sticky top-0 z-20 border-b border-border bg-card/90 backdrop-blur">
       <div className="mx-auto w-full max-w-5xl px-4 py-3 lg:px-6">
-        <div className="scrollbar-slim flex items-center gap-1 overflow-x-auto">
-          {STEP_ORDER.map((step, i) => {
-            const status = state.stepStatuses[step]
-            const active = state.activeStep === step
-            const Icon = STEP_ICONS[step]
-            const done = status === 'complete'
-            return (
-              <div key={step} className="flex flex-1 items-center">
+        <div className="mb-1 flex items-center justify-between">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Case Workflow
+          </p>
+          <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+            {completed} of {N} complete
+          </span>
+        </div>
+
+        <div className="relative">
+          {/* track (base + filled) — aligned to node centres */}
+          <div
+            className="absolute top-[15px] h-0.5 rounded-full bg-border"
+            style={{ left: `${INSET}%`, width: `${TRACK_WIDTH}%` }}
+          />
+          <div
+            className="absolute top-[15px] h-0.5 rounded-full bg-brand transition-all duration-500 ease-out"
+            style={{ left: `${INSET}%`, width: `${TRACK_WIDTH * fraction}%` }}
+          />
+
+          {/* nodes — equal-width columns keep everything evenly spaced */}
+          <div className="relative flex">
+            {STEP_ORDER.map((step) => {
+              const status = state.stepStatuses[step]
+              const active = state.activeStep === step
+              const Icon = STEP_ICONS[step]
+              const done = status === 'complete'
+              return (
                 <button
+                  key={step}
                   type="button"
                   onClick={() => dispatch({ type: 'SELECT_STEP', step })}
                   aria-current={active ? 'step' : undefined}
-                  className={cn(
-                    'group flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 transition-colors',
-                    active ? 'bg-brand-soft' : 'hover:bg-muted',
-                  )}
+                  className="flex flex-1 basis-0 flex-col items-center gap-1.5 rounded-lg py-1 transition-colors focus-visible:outline-none"
                 >
                   <span
                     className={cn(
-                      'flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold transition-all duration-200',
+                      'flex h-8 w-8 items-center justify-center rounded-full border text-[11px] font-semibold transition-all duration-200',
                       NODE_STYLE[status],
-                      active && 'ring-2 ring-brand/30 ring-offset-1',
+                      active && 'ring-2 ring-brand/30 ring-offset-2 ring-offset-card',
                     )}
                   >
                     {done ? (
-                      <Check className="h-3.5 w-3.5" />
+                      <Check className="h-4 w-4" />
                     ) : (
-                      <Icon className="h-3.5 w-3.5" />
+                      <Icon className="h-4 w-4" />
                     )}
                   </span>
-                  <span className="hidden min-w-0 flex-col text-left sm:flex">
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      Step {i + 1}
-                    </span>
-                    <span
-                      className={cn(
-                        'truncate text-xs font-medium',
-                        active ? 'text-ink' : 'text-ink-soft',
-                      )}
-                    >
-                      {STEP_SHORT[step]}
-                    </span>
-                  </span>
-                </button>
-                {i < STEP_ORDER.length - 1 && (
                   <span
                     className={cn(
-                      'h-px w-4 shrink-0 sm:w-6',
-                      done ? 'bg-brand/40' : 'bg-border',
+                      'max-w-full truncate px-1 text-center text-[11px] font-medium leading-tight',
+                      active ? 'text-ink' : 'text-muted-foreground',
                     )}
-                  />
-                )}
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Slim overall progress line under the stepper */}
-        <div className="mt-2 flex items-center gap-3">
-          <Progress value={pct} className="h-1" />
-          <span className="shrink-0 text-[11px] font-medium tabular-nums text-muted-foreground">
-            {completed}/{STEP_ORDER.length}
-          </span>
+                  >
+                    {STEP_SHORT[step]}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
         </div>
       </div>
     </div>

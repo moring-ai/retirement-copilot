@@ -404,7 +404,7 @@ export function createInitialState(): WorkspaceState {
     transferRequests: seedTransfers(t),
     webRuns: {},
     activeCaseId: null,
-    toolApprovalMode: 'ask_every_time',
+    toolApprovalMode: 'full_control',
     ...freshWorking(DEFAULT_CUSTOMER_ID),
   }
 }

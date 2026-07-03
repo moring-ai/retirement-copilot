@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Sparkles,
   RefreshCw,
@@ -50,6 +50,15 @@ export function ResponseEditor() {
   const complianceReady =
     state.stepStatuses.compliance_review === 'complete' ||
     state.stepStatuses.compliance_review === 'needs_info'
+
+  // Autopilot: the agent drafts the response on arrival; the associate then
+  // reviews and approves it (this step never auto-advances). Guarded on state
+  // (not a ref) so it is StrictMode-safe.
+  useEffect(() => {
+    if (complianceReady && !hasDraft && runningAction === null) {
+      run('draft')
+    }
+  }, [complianceReady, hasDraft, runningAction, run])
 
   const doRewrite = () => {
     if (!direction.trim()) return

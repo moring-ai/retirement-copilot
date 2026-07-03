@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import {
   ScrollText,
   Loader2,
@@ -9,6 +10,10 @@ import {
   Ban,
   UserCog,
   ArrowUpRight,
+  ArrowRight,
+  Rocket,
+  Pause,
+  RefreshCw,
   type LucideIcon,
 } from 'lucide-react'
 import type {
@@ -21,8 +26,7 @@ import { useSimulatedAgentRun } from '@/hooks/useSimulatedAgentRun'
 import { CUSTOMERS } from '@/data/customers'
 import { goalLabel } from '@/data/goals'
 import { StepHeader } from './StepHeader'
-import { StickyActionBar } from '@/components/layout/StickyActionBar'
-import { StepNav } from '@/components/layout/StepNav'
+import { StepConfirm } from './StepConfirm'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -90,7 +94,7 @@ const SEVERITY_RANK: Record<IssueSeverity, number> = {
 }
 
 export function ComplianceReviewStep() {
-  const { state } = useWorkspace()
+  const { state, dispatch } = useWorkspace()
   const { run, runningAction } = useSimulatedAgentRun()
   const status = state.stepStatuses.compliance_review
   const hasRun = status === 'complete' || status === 'needs_info'
@@ -103,6 +107,81 @@ export function ComplianceReviewStep() {
   const issues = [...state.complianceIssues].sort(
     (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity],
   )
+  const pendingTools = state.evidence.toolCalls.filter(
+    (t) => t.approval === 'pending',
+  )
+  const primaryIssue = issues.find((i) => i.recommendation !== 'proceed') ?? issues[0]
+
+  // ---- Autopilot ----
+  const sawRun = useRef(false)
+  const routedRef = useRef(false)
+  const [countdown, setCountdown] = useState<number | null>(null)
+  const [paused, setPaused] = useState(false)
+
+  // Entering the step auto-runs the compliance review. Guarded on state (not a
+  // ref) so StrictMode's mount/cleanup/remount can't cancel it permanently.
+  useEffect(() => {
+    if (formsDone && !hasRun && runningAction === null) {
+      run('compliance')
+    }
+  }, [formsDone, hasRun, runningAction, run])
+
+  // Only auto-advance / route after a live run this mount.
+  useEffect(() => {
+    if (running) sawRun.current = true
+  }, [running])
+
+  // Cleared → count down and advance to Response automatically.
+  useEffect(() => {
+    if (
+      sawRun.current &&
+      !paused &&
+      hasRun &&
+      !escalation &&
+      pendingTools.length === 0 &&
+      countdown === null
+    ) {
+      setCountdown(10)
+    }
+  }, [hasRun, escalation, pendingTools.length, paused, countdown])
+
+  // Escalation → apply the recommended routing once; the associate then
+  // acknowledges before continuing (no auto-advance).
+  useEffect(() => {
+    if (
+      sawRun.current &&
+      hasRun &&
+      escalation &&
+      pendingTools.length === 0 &&
+      primaryIssue &&
+      !routedRef.current
+    ) {
+      routedRef.current = true
+      toast({
+        variant: 'info',
+        title: `Routed — ${RECOMMENDATION[primaryIssue.recommendation].label}`,
+        description: primaryIssue.recommendationDetail,
+      })
+    }
+  }, [hasRun, escalation, pendingTools.length, primaryIssue])
+
+  useEffect(() => {
+    if (countdown === null) return
+    if (countdown <= 0) {
+      dispatch({ type: 'SELECT_STEP', step: 'response' })
+      return
+    }
+    const t = window.setTimeout(
+      () => setCountdown((c) => (c === null ? null : c - 1)),
+      1000,
+    )
+    return () => window.clearTimeout(t)
+  }, [countdown, dispatch])
+
+  const cancelAutopilot = () => {
+    setPaused(true)
+    setCountdown(null)
+  }
 
   const downloadReport = () => {
     const customer = CUSTOMERS[state.activeCustomerId]
@@ -177,6 +256,70 @@ export function ComplianceReviewStep() {
         </Popover>
       </StepHeader>
 
+      {/* Autopilot status */}
+      {countdown !== null ? (
+        <div
+          className={cn(
+            'flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 animate-fade-in',
+            escalation
+              ? 'border-warn/30 bg-warn-soft'
+              : 'border-brand/30 bg-brand-soft',
+          )}
+        >
+          <Rocket
+            className={cn(
+              'h-5 w-5 shrink-0',
+              escalation ? 'text-warn' : 'text-brand-dark',
+            )}
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-ink">
+              {escalation
+                ? `Routed — ${primaryIssue ? RECOMMENDATION[primaryIssue.recommendation].label : 'Specialist review'}`
+                : 'Compliance cleared — autopilot engaged'}
+            </p>
+            <p className="text-xs text-ink-soft">
+              {escalation ? 'The recommended routing was applied. ' : ''}Moving to
+              Response in{' '}
+              <span className="font-semibold tabular-nums">{countdown}s</span>.
+              Stay to review, or jump ahead.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={cancelAutopilot}>
+            <Pause />
+            Stay
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => dispatch({ type: 'SELECT_STEP', step: 'response' })}
+          >
+            Go now
+            <ArrowRight />
+          </Button>
+        </div>
+      ) : running ? (
+        <div className="flex items-center gap-3 rounded-xl border border-secondary/30 bg-accent px-4 py-3 animate-fade-in">
+          <Loader2 className="h-5 w-5 shrink-0 animate-spin text-secondary" />
+          <div>
+            <p className="text-sm font-semibold text-ink">
+              Autopilot — running the compliance review…
+            </p>
+            <p className="text-xs text-ink-soft">
+              The agent is checking approved language and escalation policy.
+              You’re watching.
+            </p>
+          </div>
+        </div>
+      ) : hasRun && pendingTools.length > 0 ? (
+        <div className="flex items-start gap-3 rounded-xl border border-warn/30 bg-warn-soft px-4 py-3 animate-fade-in">
+          <Pause className="mt-0.5 h-5 w-5 shrink-0 text-warn" />
+          <p className="text-sm text-ink-soft">
+            <span className="font-semibold text-ink">Autopilot paused</span> —
+            approve the pending action in the Agent Evidence panel to continue.
+          </p>
+        </div>
+      ) : null}
+
       {hasRun && (
         <Card
           className={cn(
@@ -234,35 +377,54 @@ export function ComplianceReviewStep() {
             <ScrollText className="h-6 w-6 text-muted-foreground" />
             <p className="max-w-sm text-sm text-muted-foreground">
               {formsDone
-                ? 'Run the compliance check below to surface any blockers and recommendations.'
+                ? 'Reviewing the case against compliance and escalation policy…'
                 : 'Complete the Required Forms step first.'}
             </p>
           </CardContent>
         </Card>
       )}
 
-      <StickyActionBar>
-        <StepNav>
-          {hasRun && (
-            <Button variant="outline" onClick={downloadReport}>
-              <Download />
-              Download Report
-            </Button>
-          )}
-          <Button
-            variant={hasRun ? 'outline' : 'default'}
-            disabled={runningAction !== null || !formsDone}
-            onClick={() => run('compliance')}
-          >
-            {running ? <Loader2 className="animate-spin" /> : <ScrollText />}
-            {running
-              ? 'Agent working…'
-              : hasRun
-                ? 'Re-run check'
-                : 'Check Compliance'}
-          </Button>
-        </StepNav>
-      </StickyActionBar>
+      {hasRun && countdown === null && (
+        <StepConfirm
+          tone={escalation ? 'warn' : 'success'}
+          icon={escalation ? AlertTriangle : ShieldCheck}
+          title={
+            escalation
+              ? `Escalation — ${primaryIssue ? RECOMMENDATION[primaryIssue.recommendation].label : 'specialist review'}`
+              : 'Compliance cleared'
+          }
+          description={
+            escalation
+              ? (primaryIssue?.recommendationDetail ??
+                'Review the recommendations above before continuing.')
+              : 'No compliance blockers. Continue to draft the customer response.'
+          }
+          actions={
+            <>
+              <Button
+                onClick={() =>
+                  dispatch({ type: 'SELECT_STEP', step: 'response' })
+                }
+              >
+                {escalation ? 'Acknowledge & Continue' : 'Continue to Response'}
+                <ArrowRight />
+              </Button>
+              <Button variant="outline" onClick={downloadReport}>
+                <Download />
+                Download Report
+              </Button>
+              <Button
+                variant="outline"
+                disabled={runningAction !== null}
+                onClick={() => run('compliance')}
+              >
+                {running ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+                Re-run
+              </Button>
+            </>
+          }
+        />
+      )}
     </div>
   )
 }

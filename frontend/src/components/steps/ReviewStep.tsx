@@ -16,8 +16,7 @@ import { useWorkspace } from '@/state/WorkspaceContext'
 import { CUSTOMERS } from '@/data/customers'
 import { goalLabel } from '@/data/goals'
 import { StepHeader } from './StepHeader'
-import { StickyActionBar } from '@/components/layout/StickyActionBar'
-import { StepNav } from '@/components/layout/StepNav'
+import { StepConfirm } from './StepConfirm'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -182,16 +181,25 @@ export function ReviewStep() {
         </SummarySection>
       </div>
 
-      <StickyActionBar>
-        <StepNav>
-          <span className="mr-auto hidden text-xs text-muted-foreground sm:inline">
-            {submitted
-              ? 'Submitted to a retirement servicing reviewer.'
-              : ready
-                ? 'Ready to submit.'
-                : 'Identity, goal, eligibility, and an approved response are required.'}
-          </span>
-          {submitted ? (
+      <StepConfirm
+        tone={submitted || ready ? 'success' : 'info'}
+        icon={submitted ? CheckCircle2 : Send}
+        title={
+          submitted
+            ? 'Submitted for review'
+            : ready
+              ? 'Ready to submit'
+              : 'Complete the case to submit'
+        }
+        description={
+          submitted
+            ? 'Sent to a retirement servicing reviewer.'
+            : ready
+              ? 'Everything checks out. Submit this case for a reviewer.'
+              : 'Identity, goal, eligibility, and an approved response are required before submitting.'
+        }
+        actions={
+          submitted ? (
             <Button variant="outline" onClick={() => dispatch({ type: 'GO_HOME' })}>
               <Home />
               Back to Cases
@@ -201,9 +209,9 @@ export function ReviewStep() {
               <Send />
               Submit to Review
             </Button>
-          )}
-        </StepNav>
-      </StickyActionBar>
+          )
+        }
+      />
     </div>
   )
 }
