@@ -7,14 +7,18 @@
     The router picks Path B for standard rollover questions that are NOT tied to a
     specific customer (no MCP tools; approved-guidance RAG only).
 
-🔜 STILL FUTURE — Skill-Based Validation prompt chain:
-    Today, guardrails/checks.py is a lightweight, code-only safety layer shared by both
-    paths. It will later graduate into a versioned, skill-based validation prompt chain
-    (PII redaction, advice/tax boundary, compliance/approved-language review,
-    citation/grounding check, escalation detection, final formatting), with each skill
-    logged to a `skills_used` audit trail. That is the remaining scaffold item.
+✅ DONE — Skill-Based Skills registry + validation chain is now IMPLEMENTED:
+    - Registry:      backend/app/skills/registry.py  (Skill/SkillResult, register(), run_skill())
+    - Skills:        backend/app/skills/builtin.py
+        * content    — pb_topic_select, pb_explain, pb_checklist  (Path B is now RAG + skills)
+        * validation — pii_redaction, advice_boundary_check, citation_grounding_check,
+                       escalation_detection, final_format  (reporters over guardrails/checks.py)
+    - Audit trail:   every skill appends to state['skills_used'] and mirrors into trace.steps;
+                     surfaced on the API as ChatResponse.skills_used[] and trace.skills_used.
+    The validation skills REPORT the deterministic guardrail outcome — run_guardrails
+    remains the authoritative decision-maker, so escalation stays code-owned.
 """
 from __future__ import annotations
 
-# This module is intentionally a no-op marker now that Path B lives in graph/path_b.py.
-# It tracks the one remaining future workflow (skill-based validation chain).
+# This module is now a documentation marker: Path B lives in graph/path_b.py and the
+# skill-based validation chain lives in app/skills/. No runtime logic here.

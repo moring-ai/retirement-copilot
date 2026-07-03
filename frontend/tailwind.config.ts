@@ -40,30 +40,36 @@ export default {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
-        // Raw brand tokens (from the existing Fidelity-style demo decks) for
-        // direct use in the 4-state status system + evidence panel accents.
+        // Raw brand tokens — refreshed to the Fidelity green + gold palette.
         brand: {
-          DEFAULT: '#1a7a4c',
-          dark: '#0f5a37',
-          soft: '#e8f5ee',
+          DEFAULT: '#0b7a4e',
+          dark: '#0a5c3b',
+          soft: '#e7f3ec',
+        },
+        // Gold "spark" accent (retargets the former blue secondary/accent).
+        gold: {
+          DEFAULT: '#b58a34',
+          dark: '#8c6a20',
+          soft: '#f7efda',
         },
         'accent-blue': {
-          DEFAULT: '#1a5d8c',
-          soft: '#e7f1f8',
+          // legacy alias kept pointing at gold so any stragglers stay on-brand
+          DEFAULT: '#b58a34',
+          soft: '#f7efda',
         },
         warn: {
-          DEFAULT: '#8a5a12',
-          soft: '#fbf2df',
+          DEFAULT: '#c2760b',
+          soft: '#fbeeda',
         },
         danger: {
-          DEFAULT: '#8b1a2a',
-          soft: '#f8e8ea',
+          DEFAULT: '#b4231e',
+          soft: '#fbebe9',
         },
         ink: {
-          DEFAULT: '#15233b',
-          soft: '#45546b',
+          DEFAULT: '#16241c',
+          soft: '#51605a',
         },
-        line: '#e4e9f1',
+        line: '#e5e8e1',
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -71,19 +77,20 @@ export default {
         sm: 'calc(var(--radius) - 8px)',
       },
       boxShadow: {
-        card: '0 1px 2px rgba(21,35,59,.06), 0 10px 30px rgba(21,35,59,.06)',
-        soft: '0 1px 2px rgba(21,35,59,.05), 0 4px 12px rgba(21,35,59,.05)',
+        card: '0 1px 2px rgba(16,36,28,.05), 0 10px 30px rgba(16,36,28,.06)',
+        soft: '0 1px 2px rgba(16,36,28,.04), 0 4px 12px rgba(16,36,28,.05)',
       },
       fontFamily: {
         sans: [
+          'Inter',
           '"Segoe UI"',
-          'Roboto',
           '-apple-system',
           'BlinkMacSystemFont',
           'Helvetica',
           'Arial',
           'sans-serif',
         ],
+        serif: ['Fraunces', 'Georgia', '"Times New Roman"', 'serif'],
       },
       keyframes: {
         'accordion-down': {

@@ -31,6 +31,8 @@ class CopilotState(TypedDict, total=False):
     pb_checklist: dict[str, Any]      # chain step 2 output {next_steps, required_forms}
     chain_mode: str                   # "live" | "fallback" for the prompt chain
 
+    skills_used: list[dict]           # [{skill, version, kind, status, flagged, detail}]
+
     final: dict[str, Any]             # the API response payload
     trace: list[dict]                 # [{step, status, detail}]
     errors: list[str]

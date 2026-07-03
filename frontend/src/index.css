@@ -4,37 +4,38 @@
 
 @layer base {
   :root {
-    /* Palette carried over from the existing Fidelity-style demo decks,
-       mapped onto shadcn's semantic CSS variables (HSL triplets). */
-    --background: 220 33% 97%; /* #f5f7fb */
-    --foreground: 213 45% 15%; /* #15233b */
+    /* Refreshed to the Fidelity green + gold palette, mapped onto shadcn's
+       semantic CSS variables (HSL triplets). Green = primary/action,
+       gold = accent/"spark", warm neutrals for structure. */
+    --background: 90 20% 97%; /* #f6f7f4 warm off-white */
+    --foreground: 140 25% 12%; /* #16241c deep green-ink */
 
     --card: 0 0% 100%; /* #ffffff */
-    --card-foreground: 213 45% 15%;
+    --card-foreground: 140 25% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 213 45% 15%;
+    --popover-foreground: 140 25% 12%;
 
-    --border: 219 30% 91%; /* #e4e9f1 */
-    --input: 219 30% 91%;
-    --ring: 154 65% 29%; /* brand green focus ring */
+    --border: 96 14% 90%; /* #e5e8e1 */
+    --input: 96 14% 90%;
+    --ring: 157 83% 26%; /* brand green focus ring */
 
-    --primary: 154 65% 29%; /* #1a7a4c brand green */
+    --primary: 157 83% 26%; /* #0b7a4e brand green */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 202 69% 33%; /* #1a5d8c accent blue */
+    --secondary: 41 61% 38%; /* #9a7526 readable gold */
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 220 30% 95%;
-    --muted-foreground: 216 17% 50%; /* #6c7a93 */
+    --muted: 90 17% 93%; /* #eef1eb */
+    --muted-foreground: 140 8% 45%; /* #6b7a70 */
 
-    --accent: 205 60% 94%; /* soft blue hover surface */
-    --accent-foreground: 202 69% 25%;
+    --accent: 43 62% 91%; /* soft gold hover surface #f7efda */
+    --accent-foreground: 42 63% 30%;
 
-    --destructive: 350 68% 33%; /* #8b1a2a */
+    --destructive: 2 71% 41%; /* #b4231e */
     --destructive-foreground: 0 0% 100%;
 
-    --radius: 1rem; /* 16px */
+    --radius: 0.875rem; /* 14px — a touch tighter/more modern */
   }
 
   * {
@@ -51,6 +52,7 @@
     @apply bg-background text-foreground font-sans antialiased;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'ss01';
   }
 }
 
@@ -67,4 +69,87 @@
   .scrollbar-slim::-webkit-scrollbar-track {
     background: transparent;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Customer surface — "calm editorial / papery" theme.
+   A warm-ivory register layered over the existing tokens for the end-user
+   Rollover Dossier. Deliberately NOT shiny: ruled lines, serif headings,
+   quiet ink-in motion, no gradients/glow.
+--------------------------------------------------------------------------- */
+.paper {
+  --paper-bg: #f4efe3;      /* warm ivory desk */
+  --paper-card: #fffdf7;    /* the dossier page */
+  --paper-rule: #e6ddca;    /* hairline rules / margins */
+  --paper-ink: #1c2620;     /* near-black warm green-ink */
+  --paper-ink-soft: #5f6357;
+  --paper-muted: #948d78;
+  --paper-green: #0b7a4e;   /* brand green */
+  --paper-green-dark: #0a5c3b;
+  --paper-gold: #b58a34;    /* the Fidelity spark */
+  background-color: var(--paper-bg);
+  color: var(--paper-ink);
+  font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;
+}
+.paper-serif {
+  font-family: 'Fraunces', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+  letter-spacing: -0.005em;
+}
+.paper-card {
+  background: var(--paper-card);
+  border: 1px solid var(--paper-rule);
+}
+.paper-rule {
+  border: 0;
+  height: 1px;
+  background: var(--paper-rule);
+}
+/* the traveling "nib" caret that marks where the agent is writing */
+.paper-nib {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: #0b7a4e;
+  border-radius: 1px;
+  animation: nib-blink 1.15s step-end infinite;
+  vertical-align: text-bottom;
+}
+@keyframes nib-blink {
+  50% {
+    opacity: 0.12;
+  }
+}
+/* rows "ink in" as the agent composes — reuse a gentle rise + fade */
+@keyframes ink-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.ink-in {
+  animation: ink-in 0.5s ease-out both;
+}
+
+/* Monospace utility for the router backstage "instrument" surface. */
+.mono {
+  font-family: ui-monospace, 'SFMono-Regular', 'SF Mono', Menlo, Consolas,
+    'Liberation Mono', monospace;
+}
+/* Backstage drawer slide-in */
+@keyframes bs-slide {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+.bs-slide {
+  animation: bs-slide 0.2s ease-out both;
 }

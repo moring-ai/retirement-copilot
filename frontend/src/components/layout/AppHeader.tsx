@@ -1,4 +1,5 @@
-import { Save, FileDown, ShieldCheck, ArrowLeft, Clock3 } from 'lucide-react'
+import { Save, FileDown, ArrowLeft, Clock3 } from 'lucide-react'
+import { FidelityMark } from '@/components/brand/FidelityLogo'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/use-toast'
 import { EvidenceDrawerToggle } from './EvidenceDrawerToggle'
@@ -29,14 +30,21 @@ export function AppHeader() {
             <span className="hidden sm:inline">Cases</span>
           </Button>
         ) : (
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-            <ShieldCheck className="h-5 w-5" />
-          </span>
+          <FidelityMark size={38} className="shrink-0" />
         )}
 
         <div className="min-w-0 leading-tight">
           <h1 className="truncate text-base font-semibold text-ink lg:text-lg">
-            {inWorkspace ? customer.name : 'Retirement Case Workspace'}
+            {inWorkspace ? (
+              customer.name
+            ) : (
+              <span>
+                <span className="font-serif italic font-semibold text-brand">
+                  Fidelity
+                </span>{' '}
+                <span className="text-ink">Retirement</span>
+              </span>
+            )}
           </h1>
           <p className="hidden truncate text-xs text-muted-foreground sm:block">
             {inWorkspace

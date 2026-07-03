@@ -29,6 +29,15 @@ class ToolCalled(BaseModel):
     status: str  # "ok" | "error"
 
 
+class SkillUsed(BaseModel):
+    skill: str
+    version: str
+    kind: str  # "content" | "validation"
+    status: str = "ok"  # "ok" | "error"
+    flagged: bool = False
+    detail: str = ""
+
+
 class ChatResponse(BaseModel):
     path: str = "A_augmented_llm"  # "A_augmented_llm" | "B_prompt_chain"
     answer: str
@@ -43,6 +52,7 @@ class ChatResponse(BaseModel):
     clarification_needed: bool = False
     rag_sources: list[RagSource] = []
     tools_called: list[ToolCalled] = []
+    skills_used: list[SkillUsed] = []
     trace: dict[str, Any] = {}
 
 

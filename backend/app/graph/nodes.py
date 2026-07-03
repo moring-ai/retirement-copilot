@@ -13,6 +13,7 @@ from app.guardrails import checks
 from app.llm import client as llm_client
 from app.mcp_client import client as mcp_client
 from app.rag import retriever
+from app.skills import run_skill
 
 # Read tools called for a customer-specific rollover case (the write tool is
 # intentionally excluded from the automatic path).
@@ -173,17 +174,32 @@ def guardrails_check(state: "dict") -> dict:
     state["guardrails"] = result
     _trace(state, "guardrails_check", "ok",
            f"escalation={result['escalation_required']} flags={len(result['flags'])}")
+
+    # Skill-based validation chain (audit trail). These skills REPORT the
+    # already-computed guardrail outcome — they do not re-decide anything, so the
+    # authoritative escalation/redaction decisions remain owned by run_guardrails.
+    for skill in (
+        "pii_redaction",
+        "advice_boundary_check",
+        "citation_grounding_check",
+        "escalation_detection",
+    ):
+        run_skill(state, skill)
     return state
 
 
 # --- 8. format --------------------------------------------------------------
 def format_final_response(state: "dict") -> dict:
     path = state.get("classification", {}).get("path", "A_augmented_llm")
+    # Terminal audit marker — closes the skills_used trail end-to-end.
+    run_skill(state, "final_format")
+    skills_used = state.get("skills_used", [])
     trace = {
         "classification": state.get("classification", {}),
         "parsed": state.get("parsed", {}),
         "steps": state.get("trace", []),
         "tool_results": state.get("tool_results", {}),
+        "skills_used": skills_used,
         "model_mode": state.get("chain_mode") or state.get("model_mode", settings.model_mode),
         "errors": state.get("errors", []),
     }
@@ -209,6 +225,7 @@ def format_final_response(state: "dict") -> dict:
             "clarification_needed": True,
             "rag_sources": rag_sources,
             "tools_called": state.get("tools_called", []),
+            "skills_used": skills_used,
             "trace": trace,
         }
         _trace(state, "format_final_response", "ok", "clarification response")
@@ -237,6 +254,7 @@ def format_final_response(state: "dict") -> dict:
         "clarification_needed": False,
         "rag_sources": guardrails.get("rag_sources", []),
         "tools_called": state.get("tools_called", []),
+        "skills_used": skills_used,
         "trace": trace,
     }
     _trace(state, "format_final_response", "ok", "full response")

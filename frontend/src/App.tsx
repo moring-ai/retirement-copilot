@@ -1,19 +1,22 @@
-import { WorkspaceProvider } from '@/state/WorkspaceContext'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Toaster } from '@/components/ui/toaster'
-import { AppHeader } from '@/components/layout/AppHeader'
-import { AppShell } from '@/components/layout/AppShell'
+import { resolveRole } from '@/lib/role'
+import { RolePicker } from '@/components/role/RolePicker'
+import { AssociateApp } from '@/components/associate/AssociateApp'
+import { CustomerApp } from '@/components/customer/CustomerApp'
 
 export default function App() {
+  const role = resolveRole()
   return (
-    <WorkspaceProvider>
-      <TooltipProvider delayDuration={200}>
-        <div className="flex h-screen flex-col overflow-hidden bg-background">
-          <AppHeader />
-          <AppShell />
-        </div>
-        <Toaster />
-      </TooltipProvider>
-    </WorkspaceProvider>
+    <TooltipProvider delayDuration={200}>
+      {role === 'associate' ? (
+        <AssociateApp />
+      ) : role === 'customer' ? (
+        <CustomerApp />
+      ) : (
+        <RolePicker />
+      )}
+      <Toaster />
+    </TooltipProvider>
   )
 }

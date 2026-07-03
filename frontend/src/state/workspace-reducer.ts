@@ -8,6 +8,8 @@ import type {
   EligibilityResult,
   Finding,
   FormVerifyStatus,
+  IssueRecommendation,
+  IssueSeverity,
   RagSource,
   RolloverPath,
   RunningAction,
@@ -20,6 +22,8 @@ import type {
   UploadedForm,
   WorkspaceState,
 } from '@/types'
+import type { AgentRunEvent } from '@/lib/agentBus'
+import type { ChatResponse } from '@/lib/chatContract'
 import { CUSTOMERS, DEFAULT_CUSTOMER_ID } from '@/data/customers'
 import { CURRENT_ASSOCIATE, seedCases, seedTransfers } from '@/data/cases'
 import { ROLLOVER_GOALS, goalLabel } from '@/data/goals'
@@ -92,6 +96,7 @@ export type Action =
   | { type: 'TRANSFER_CASE'; caseId: string; toAssociate: string; note?: string }
   | { type: 'ACCEPT_TRANSFER'; requestId: string }
   | { type: 'DECLINE_TRANSFER'; requestId: string }
+  | { type: 'INGEST_AGENT_RUN'; run: AgentRunEvent }
 
 function uniquePush<T>(list: T[], item: T, key: (x: T) => string): T[] {
   if (list.some((x) => key(x) === key(item))) return list
@@ -201,6 +206,161 @@ function progressPct(statuses: Record<StepId, StepStatus>): number {
   return Math.round((done / STEP_ORDER.length) * 100)
 }
 
+// ---------------------------------------------------------------------------
+// Hydrate the associate working state from a REAL customer /chat run.
+// This is how "the associate undergoes the corresponding agent actions": a
+// customer-initiated run fills the case's evidence panel, findings, eligibility,
+// forms, compliance, and draft — from the same ChatResponse the customer saw.
+// ---------------------------------------------------------------------------
+
+const DOC_DISPLAY: Record<string, string> = {
+  'rollover_sop.md': 'IRA Rollover Policy',
+  'ira_opening_guidance.md': 'IRA Opening Guidance',
+  'required_forms_guidance.md': 'Required Forms Guidance',
+  'approved_customer_language.md': 'Approved Customer Language',
+  'escalation_policy.md': 'Escalation Policy',
+  'tax_advice_boundaries.md': 'Tax Advice Boundaries',
+}
+
+function ragToSources(r: ChatResponse): RagSource[] {
+  return r.rag_sources.map((s) => ({
+    chunk_id: s.chunk_id,
+    doc: s.doc,
+    displayName: DOC_DISPLAY[s.doc] ?? s.doc,
+    score: s.score ?? 0,
+  }))
+}
+
+function runToFindings(r: ChatResponse): Finding[] {
+  return r.findings.map((f) => {
+    const v = f.value.trim().toLowerCase()
+    const good = ['none', 'no', 'allowed', 'true', 'complete', 'none on file']
+    const bad = ['unknown', 'incomplete', 'yes', 'false']
+    let tone: Finding['tone'] = 'neutral'
+    if (good.includes(v)) tone = 'positive'
+    else if (bad.includes(v)) tone = 'warning'
+    // context tweaks: "Outstanding plan loan: No" is positive; "Rollover eligibility: allowed" positive
+    if (/loan/i.test(f.label) && v === 'no') tone = 'positive'
+    if (/restrictions/i.test(f.label) && v === 'none') tone = 'positive'
+    return { label: f.label, value: f.value, source: f.source, tone }
+  })
+}
+
+function runToIssues(r: ChatResponse): ComplianceIssue[] {
+  if (!r.escalation_required) {
+    return [
+      {
+        id: 'no-blockers',
+        title: 'No compliance blockers detected',
+        detail:
+          'Identity is verified, no account restrictions are present, and the source plan permits the rollover. The case may proceed to a drafted customer response.',
+        severity: 'info',
+        recommendation: 'proceed',
+        recommendationDetail:
+          'Proceed to draft the customer response. Standard human review still applies before anything is sent.',
+      },
+    ]
+  }
+  return r.escalation_reasons.map((reason, i) => {
+    const low = reason.toLowerCase()
+    let severity: IssueSeverity = 'warning'
+    let recommendation: IssueRecommendation = 'reassign_specialist'
+    let recDetail =
+      'Reassign to a specialist to resolve this item before initiating any transfer.'
+    if (low.includes('beneficiary')) {
+      severity = 'critical'
+      recommendation = 'escalate_supervisor'
+      recDetail =
+        'Escalate to your supervisor and hold the case until the beneficiary dispute is resolved.'
+    } else if (low.includes('identity')) {
+      severity = 'critical'
+      recommendation = 'reject_case'
+      recDetail =
+        'Do not proceed. Return the case to intake to complete identity verification.'
+    }
+    return {
+      id: `esc-${i}`,
+      title: reason.replace(/\.$/, ''),
+      detail: reason,
+      severity,
+      recommendation,
+      recommendationDetail: recDetail,
+    }
+  })
+}
+
+function hydrateFromRun(customerId: string, r: ChatResponse): Partial<WorkingState> {
+  const escalation = r.escalation_required
+  const statuses: Record<StepId, StepStatus> = {
+    customer_snapshot: 'complete',
+    goal_eligibility: 'complete',
+    required_forms: 'complete',
+    compliance_review: escalation ? 'needs_info' : 'complete',
+    response: escalation ? 'pending' : 'complete',
+    review: escalation ? 'pending' : 'in_progress',
+  }
+  return {
+    activeCustomerId: customerId,
+    activeStep: escalation ? 'compliance_review' : 'review',
+    stepStatuses: statuses,
+    identityVerified: true,
+    selectedGoalId: 'direct_traditional',
+    evidence: {
+      timeline: [
+        { id: 'wr-1', timestamp: '+0.0s', label: 'Customer started a rollover online' },
+        {
+          id: 'wr-2',
+          timestamp: '+1.2s',
+          label: 'Agent checked accounts against approved policy',
+          detail: `${r.tools_called.length} system lookups · ${r.rag_sources.length} sources`,
+        },
+        {
+          id: 'wr-3',
+          timestamp: '+2.4s',
+          label: escalation
+            ? 'Escalation flagged — routed for specialist review'
+            : 'Eligibility confirmed — draft prepared',
+        },
+      ],
+      sources: ragToSources(r),
+      toolCalls: r.tools_called.map((t) => ({
+        tool: t.tool,
+        status: t.status,
+        approval: 'approved' as const,
+      })),
+      confidence: escalation ? 'Medium' : 'High',
+      riskTags: escalation
+        ? r.escalation_reasons.slice(0, 3).map((x) => x.replace(/\.$/, ''))
+        : [],
+      complianceWarnings: r.compliance_notes
+        .filter((n) => /advice|tax|money|movement|pii/i.test(n))
+        .slice(0, 3),
+    },
+    findings: runToFindings(r),
+    eligibilityResult: {
+      eligible: !escalation,
+      headline: escalation
+        ? 'Needs review before a rollover can proceed'
+        : 'Eligible for a direct rollover',
+      summary: r.case_summary || r.answer.slice(0, 240),
+    },
+    rolloverPath: {
+      recommended: escalation ? 'Hold — pending review' : 'Direct rollover',
+      detail: escalation
+        ? 'Confirm the flagged items before any path is initiated.'
+        : 'Funds move straight from the former employer plan to the Fidelity IRA — the customer never takes receipt.',
+      avoids: escalation ? [] : ['Mandatory 20% withholding', '60-day redeposit requirement'],
+    },
+    requiredForms: r.required_forms,
+    missingInformation: [],
+    recommendedAction: escalation
+      ? 'Do not initiate the rollover. Escalate for review of the flagged items.'
+      : 'Proceed to draft the customer response for review.',
+    complianceIssues: runToIssues(r),
+    draftText: r.customer_draft,
+  }
+}
+
 /** Stamp the active case summary with the latest working-state snapshot. */
 function touchCase(state: WorkspaceState): WorkspaceState {
   if (!state.activeCaseId) return state
@@ -242,6 +402,7 @@ export function createInitialState(): WorkspaceState {
     view: 'home',
     cases: seedCases(t),
     transferRequests: seedTransfers(t),
+    webRuns: {},
     activeCaseId: null,
     toolApprovalMode: 'ask_every_time',
     ...freshWorking(DEFAULT_CUSTOMER_ID),
@@ -262,11 +423,15 @@ export function workspaceReducer(
     case 'OPEN_CASE': {
       const summary = state.cases.find((c) => c.id === action.caseId)
       if (!summary) return state
+      const web = state.webRuns[summary.id]
+      const working = web
+        ? { ...openCaseWorking(summary), ...hydrateFromRun(summary.customerId, web) }
+        : openCaseWorking(summary)
       return {
         ...state,
         view: 'workspace',
         activeCaseId: summary.id,
-        ...openCaseWorking(summary),
+        ...working,
       }
     }
 
@@ -570,6 +735,45 @@ export function workspaceReducer(
           r.id === action.requestId ? { ...r, status: 'declined' } : r,
         ),
       }
+
+    case 'INGEST_AGENT_RUN': {
+      const { run } = action
+      // Path B (education) and non-customer runs never create an associate case.
+      if (run.path !== 'A_augmented_llm' || !run.caseId) return state
+
+      const response = run.response
+      const escalation = response.escalation_required
+      const existing = state.cases.find((c) => c.id === run.caseId)
+      const t = now()
+
+      const summary: CaseSummary = {
+        id: run.caseId,
+        customerId: run.customerId,
+        customerName: run.customerName,
+        goalLabel: run.goalLabel || 'Direct rollover to a Traditional IRA',
+        stage: escalation ? 'escalated' : 'in_review',
+        priority: escalation ? 'high' : 'medium',
+        assignee: CURRENT_ASSOCIATE,
+        currentStep: escalation ? 'compliance_review' : 'response',
+        progressPct: escalation ? 66 : 83,
+        lastUpdatedBy: `${run.customerName} (online)`,
+        lastUpdatedAt: t,
+        createdAt: existing?.createdAt ?? t,
+      }
+
+      const cases = existing
+        ? state.cases.map((c) => (c.id === run.caseId ? summary : c))
+        : [summary, ...state.cases]
+      const webRuns = { ...state.webRuns, [run.caseId]: response }
+
+      // If the associate is already viewing this case, fill it live.
+      const live =
+        state.activeCaseId === run.caseId
+          ? hydrateFromRun(run.customerId, response)
+          : {}
+
+      return { ...state, cases, webRuns, ...live }
+    }
 
     default:
       return state

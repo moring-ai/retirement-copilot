@@ -8,6 +8,8 @@
 //   - Tool names             -> mcp_server/server.py
 //   - RAG doc / chunk ids    -> backend/app/rag/ingest.py (_DOC_PREFIX)
 
+import type { ChatResponse } from '@/lib/chatContract'
+
 export type ToolStatus = 'ok' | 'error'
 export type ConfidenceLevel = 'High' | 'Medium' | 'Low'
 
@@ -240,6 +242,8 @@ export interface WorkspaceState {
   view: AppView
   cases: CaseSummary[]
   transferRequests: TransferRequest[]
+  /** Real /chat responses from customer-initiated (web) cases, keyed by case id. */
+  webRuns: Record<string, ChatResponse>
   activeCaseId: string | null
   activeCustomerId: string
   activeStep: StepId
