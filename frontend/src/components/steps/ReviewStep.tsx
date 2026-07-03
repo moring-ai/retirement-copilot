@@ -19,6 +19,7 @@ import { goalLabel } from '@/data/goals'
 import { StepHeader } from './StepHeader'
 import { StepConfirm } from './StepConfirm'
 import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
@@ -230,8 +231,31 @@ export function ReviewStep() {
           submitted
             ? 'This case has been approved and finalised.'
             : ready
-              ? 'Everything checks out — approve, or use the caret to move it to pending or reject.'
+              ? 'Approve the case, or move it to pending / reject it.'
               : 'Identity, goal, eligibility, and an approved response are required before approving.'
+        }
+        actions={
+          submitted ? (
+            <Button variant="outline" onClick={() => dispatch({ type: 'GO_HOME' })}>
+              <Home />
+              Back to Cases
+            </Button>
+          ) : (
+            <>
+              <Button disabled={!ready} onClick={approve}>
+                <CheckCircle2 />
+                Approve
+              </Button>
+              <Button variant="outline" onClick={() => moveTo('pending')}>
+                <PauseCircle />
+                Move to Pending
+              </Button>
+              <Button variant="outline" onClick={() => moveTo('rejected')}>
+                <XCircle />
+                Reject
+              </Button>
+            </>
+          )
         }
       />
     </div>
