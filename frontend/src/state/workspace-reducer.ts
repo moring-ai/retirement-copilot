@@ -92,6 +92,7 @@ export type Action =
   | { type: 'SET_COMPLIANCE_DOC_APPROVED'; approved: boolean }
   | { type: 'SET_CASE_PRIORITY'; caseId: string; priority: CasePriority }
   | { type: 'SET_CASE_STAGE'; caseId: string; stage: CaseStage }
+  | { type: 'SET_OUTCOME'; outcome: CaseStage | null }
   | { type: 'TRANSFER_CASE'; caseId: string; toAssociate: string; note?: string }
   | { type: 'ACCEPT_TRANSFER'; requestId: string }
   | { type: 'DECLINE_TRANSFER'; requestId: string }
@@ -405,6 +406,7 @@ export function createInitialState(): WorkspaceState {
     transferRequests: seedTransfers(t),
     webRuns: {},
     activeCaseId: null,
+    pendingOutcome: null,
     toolApprovalMode: 'full_control',
     ...freshWorking(DEFAULT_CUSTOMER_ID),
   }
@@ -419,7 +421,10 @@ export function workspaceReducer(
       return { ...state, view: action.view }
 
     case 'GO_HOME':
-      return { ...state, view: 'home' }
+      return { ...state, view: 'home', pendingOutcome: null }
+
+    case 'SET_OUTCOME':
+      return { ...state, pendingOutcome: action.outcome }
 
     case 'OPEN_CASE': {
       const summary = state.cases.find((c) => c.id === action.caseId)
@@ -432,6 +437,7 @@ export function workspaceReducer(
         ...state,
         view: 'workspace',
         activeCaseId: summary.id,
+        pendingOutcome: null,
         ...working,
       }
     }
@@ -459,6 +465,7 @@ export function workspaceReducer(
         view: 'workspace',
         cases: [newCase, ...state.cases],
         activeCaseId: id,
+        pendingOutcome: null,
         ...freshWorking(customerId),
       }
     }

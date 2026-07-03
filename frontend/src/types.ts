@@ -250,6 +250,8 @@ export interface WorkspaceState {
   /** Real /chat responses from customer-initiated (web) cases, keyed by case id. */
   webRuns: Record<string, ChatResponse>
   activeCaseId: string | null
+  /** Set when a terminal stage (pending/submitted/rejected) is applied — drives the go-home popup. */
+  pendingOutcome: CaseStage | null
   activeCustomerId: string
   activeStep: StepId
   stepStatuses: Record<StepId, StepStatus>

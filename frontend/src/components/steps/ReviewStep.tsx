@@ -20,7 +20,6 @@ import { StepHeader } from './StepHeader'
 import { StepConfirm } from './StepConfirm'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { toast } from '@/components/ui/use-toast'
 import { cn } from '@/lib/utils'
 
 function SummarySection({
@@ -77,26 +76,15 @@ export function ReviewStep() {
     result !== null &&
     state.responseApproved
 
-  const caseId = state.activeCaseId ?? customer.customer_id
-
   const approve = () => {
     dispatch({ type: 'SET_STEP_STATUS', step: 'review', status: 'complete' })
-    toast({
-      variant: 'success',
-      title: 'Case approved',
-      description: `${caseId} approved and finalised.`,
-    })
+    dispatch({ type: 'SET_OUTCOME', outcome: 'submitted' })
   }
 
   const moveTo = (stage: 'pending' | 'rejected') => {
     if (state.activeCaseId)
       dispatch({ type: 'SET_CASE_STAGE', caseId: state.activeCaseId, stage })
-    toast({
-      variant: 'info',
-      title: stage === 'pending' ? 'Moved to pending' : 'Case rejected',
-      description: `${caseId} marked ${stage}.`,
-    })
-    dispatch({ type: 'GO_HOME' })
+    dispatch({ type: 'SET_OUTCOME', outcome: stage })
   }
 
   useRegisterIslandActions(

@@ -92,9 +92,10 @@ export function RequiredFormsStep() {
     toast({
       variant: 'info',
       title: 'Customer notified',
-      description: 'Case moved to pending and sent to review.',
+      description: 'Case moved to pending.',
     })
     dispatch({ type: 'SELECT_STEP', step: 'review' })
+    dispatch({ type: 'SET_OUTCOME', outcome: 'pending' })
   }
 
   return (
