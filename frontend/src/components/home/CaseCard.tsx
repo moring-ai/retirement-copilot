@@ -29,7 +29,12 @@ export function CaseCard({
   onTransfer: (summary: CaseSummary) => void
 }) {
   const { dispatch } = useWorkspace()
-  const cta = summary.stage === 'submitted' ? 'Review' : 'Continue'
+  const cta =
+    summary.stage === 'submitted'
+      ? 'Review'
+      : summary.stage === 'pending'
+        ? 'Open'
+        : 'Continue'
 
   return (
     <div

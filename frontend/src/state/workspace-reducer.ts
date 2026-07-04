@@ -91,7 +91,7 @@ export type Action =
   | { type: 'SET_RESPONSE_APPROVED'; approved: boolean }
   | { type: 'SET_COMPLIANCE_DOC_APPROVED'; approved: boolean }
   | { type: 'SET_CASE_PRIORITY'; caseId: string; priority: CasePriority }
-  | { type: 'SET_CASE_STAGE'; caseId: string; stage: CaseStage }
+  | { type: 'SET_CASE_STAGE'; caseId: string; stage: CaseStage; progressPct?: number; currentStep?: StepId }
   | { type: 'SET_OUTCOME'; outcome: CaseStage | null }
   | { type: 'TRANSFER_CASE'; caseId: string; toAssociate: string; note?: string }
   | { type: 'ACCEPT_TRANSFER'; requestId: string }
@@ -722,6 +722,8 @@ export function workspaceReducer(
             ? {
                 ...c,
                 stage: action.stage,
+                ...(action.progressPct !== undefined ? { progressPct: action.progressPct } : {}),
+                ...(action.currentStep ? { currentStep: action.currentStep } : {}),
                 lastUpdatedBy: CURRENT_ASSOCIATE,
                 lastUpdatedAt: now(),
               }

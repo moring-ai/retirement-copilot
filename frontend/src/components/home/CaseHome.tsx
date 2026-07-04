@@ -8,6 +8,8 @@ import {
 } from 'lucide-react'
 import type { CasePriority, CaseStage, CaseSummary } from '@/types'
 import { useWorkspace } from '@/state/WorkspaceContext'
+import { useDemo } from '@/state/DemoContext'
+import { getScenarioByCaseId } from '@/data/demo-scenarios'
 import { CURRENT_ASSOCIATE } from '@/data/associates'
 import { CaseCard } from './CaseCard'
 import { NewCaseDialog } from './NewCaseDialog'
@@ -38,7 +40,15 @@ const stageIn = (c: CaseSummary, stages: CaseStage[]) => stages.includes(c.stage
 
 export function CaseHome() {
   const { state, dispatch } = useWorkspace()
+  const demo = useDemo()
   const [query, setQuery] = useState('')
+
+  // Opening a case hands it to the agent-assisted workspace.
+  const openCase = (id: string) => {
+    const scenario = getScenarioByCaseId(id)
+    if (scenario) demo.start(scenario.id)
+    else dispatch({ type: 'OPEN_CASE', caseId: id })
+  }
   const [newCaseOpen, setNewCaseOpen] = useState(false)
   const [transferTarget, setTransferTarget] = useState<CaseSummary | null>(null)
   const [tab, setTab] = useState<HomeTab>('all')
@@ -53,7 +63,8 @@ export function CaseHome() {
     () => ({
       all: state.cases.length,
       attention: state.cases.filter(needsAttention).length,
-      pending: state.cases.filter((c) => c.stage === 'draft').length,
+      pending: state.cases.filter((c) => c.stage === 'draft' || c.stage === 'pending')
+        .length,
       in_review: state.cases.filter((c) => stageIn(c, ['in_review', 'escalated']))
         .length,
       finished: state.cases.filter((c) => c.stage === 'submitted').length,
@@ -65,7 +76,8 @@ export function CaseHome() {
   const filtered = useMemo(() => {
     let list = [...state.cases]
     if (tab === 'attention') list = list.filter(needsAttention)
-    else if (tab === 'pending') list = list.filter((c) => c.stage === 'draft')
+    else if (tab === 'pending')
+      list = list.filter((c) => c.stage === 'draft' || c.stage === 'pending')
     else if (tab === 'in_review')
       list = list.filter((c) => stageIn(c, ['in_review', 'escalated']))
     else if (tab === 'finished') list = list.filter((c) => c.stage === 'submitted')
@@ -230,7 +242,7 @@ export function CaseHome() {
                       <CaseCard
                         summary={c}
                         now={now}
-                        onOpen={(id) => dispatch({ type: 'OPEN_CASE', caseId: id })}
+                        onOpen={openCase}
                         onTransfer={(s) => setTransferTarget(s)}
                       />
                     </div>
@@ -243,7 +255,7 @@ export function CaseHome() {
 
         <div className="mt-8 flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
           <ShieldCheck className="h-3.5 w-3.5" />
-          Associate-facing · human-in-the-loop · mock data only
+          Associate-facing · human-in-the-loop · every action reviewed before it’s sent
         </div>
       </div>
 
