@@ -242,7 +242,7 @@ export function AgentEvidencePanel() {
   }
 
   return (
-    <aside className="flex h-full w-[380px] shrink-0 flex-col border-l border-border bg-card lg:w-[420px] xl:w-[440px]">
+    <aside className="flex h-full w-[400px] shrink-0 flex-col border-l border-border bg-card lg:w-[460px] xl:w-[520px]">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="flex h-7 w-7 items-center justify-center rounded-full" style={{ background: accent + '18', color: accent }}>

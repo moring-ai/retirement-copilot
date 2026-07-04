@@ -87,113 +87,133 @@ export function PathAWorkspace({ scenario }: { scenario: DemoScenario }) {
 
       <div className="flex min-h-0 flex-1">
         <main className="scrollbar-slim min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-2xl px-5 py-6">
-            {/* question */}
-            <div className="rounded-xl border border-border bg-card p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">Question</p>
-              <p className="mt-1.5 text-[15px] leading-relaxed text-ink">“{scenario.question}”</p>
-            </div>
-
-            {/* action bar */}
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="outline" onClick={copyAnswer} disabled={!done}><Copy className="h-3.5 w-3.5" /> Copy Answer</Button>
-              <Button size="sm" variant="outline" onClick={exportAnswer} disabled={!done}><Download className="h-3.5 w-3.5" /> Export Answer</Button>
-              <Button size="sm" variant="secondary" onClick={() => start('b-robert')}><ExternalLink className="h-3.5 w-3.5" /> Start Customer Case</Button>
-              <Button size="sm" variant="ghost" onClick={() => setFollowupOpen((o) => !o)}><MessageSquarePlus className="h-3.5 w-3.5" /> Ask Follow-up</Button>
-            </div>
-            {followupOpen && (
-              <div className="mt-2 animate-fade-in rounded-lg border border-dashed border-border bg-card px-3 py-2">
-                <input
-                  disabled
-                  placeholder="Ask a follow-up question… (disabled in this demo)"
-                  className="w-full bg-transparent text-sm text-ink placeholder:text-muted-foreground focus:outline-none"
-                />
-              </div>
-            )}
-
-            {/* streaming answer card */}
-            <div className="mt-4 rounded-xl border border-border bg-card p-5">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: PATH_A + '18', color: PATH_A }}>
-                  <Sparkles className="h-3.5 w-3.5" />
-                </span>
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">{streaming ? 'Generating answer…' : 'General answer'}</span>
-              </div>
-              {shown.length === 0 ? (
-                <div className="space-y-2" aria-hidden>
-                  <div className="h-3 w-11/12 animate-pulse rounded bg-muted" />
-                  <div className="h-3 w-full animate-pulse rounded bg-muted" />
-                  <div className="h-3 w-4/5 animate-pulse rounded bg-muted" />
+          <div className="mx-auto w-full max-w-[1400px] px-6 py-6 lg:px-10">
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
+              {/* LEFT — question + answer */}
+              <div className="min-w-0 space-y-4">
+                {/* question */}
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">Question</p>
+                  <p className="mt-1.5 text-[15px] leading-relaxed text-ink">“{scenario.question}”</p>
                 </div>
-              ) : (
-                <p className="whitespace-pre-line text-[14px] leading-relaxed text-ink">
-                  {shown}
-                  {streaming && <span className="ml-0.5 inline-block h-4 w-[2px] translate-y-0.5 animate-pulse bg-brand align-middle" />}
-                </p>
-              )}
-              {done && scenario.caveat && (
-                <div className="mt-4 flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5 animate-fade-in">
-                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-secondary" />
-                  <p className="text-[12px] leading-relaxed text-muted-foreground">{scenario.caveat}</p>
-                </div>
-              )}
-            </div>
 
-            {/* quick summary */}
-            {done && scenario.quickSummary && (
-              <div className="mt-4 animate-fade-in rounded-xl border border-border bg-card p-4">
-                <div className="mb-2 flex items-center gap-1.5">
-                  <ListChecks className="h-3.5 w-3.5 text-secondary" />
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">Quick summary</span>
+                {/* action bar */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={copyAnswer} disabled={!done}><Copy className="h-3.5 w-3.5" /> Copy Answer</Button>
+                  <Button size="sm" variant="outline" onClick={exportAnswer} disabled={!done}><Download className="h-3.5 w-3.5" /> Export Answer</Button>
+                  <Button size="sm" variant="secondary" onClick={() => start('b-robert')}><ExternalLink className="h-3.5 w-3.5" /> Start Customer Case</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setFollowupOpen((o) => !o)}><MessageSquarePlus className="h-3.5 w-3.5" /> Ask Follow-up</Button>
                 </div>
-                <ul className="space-y-1.5">
-                  {scenario.quickSummary.map((b) => (
-                    <li key={b} className="flex gap-2 text-[13px] leading-snug text-ink">
-                      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: PATH_A }} />
-                      {b}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* sources + skills (progressive) */}
-            {(sourcesShown || skillsShown.length > 0) && (
-              <div className="mt-4 space-y-2.5">
-                {sourcesShown && (
-                  <div className="flex flex-wrap items-center gap-2 animate-fade-in">
-                    <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-soft">
-                      <BookText className="h-3.5 w-3.5 text-secondary" /> Sources
-                    </span>
-                    {scenario.ragSources.map((s) => (
-                      <span key={s.id} className="rounded-md border border-border bg-card px-2 py-0.5 font-mono text-[10.5px] text-ink-soft">{s.id}</span>
-                    ))}
+                {followupOpen && (
+                  <div className="animate-fade-in rounded-lg border border-dashed border-border bg-card px-3 py-2">
+                    <input
+                      disabled
+                      placeholder="Ask a follow-up question… (disabled in this demo)"
+                      className="w-full bg-transparent text-sm text-ink placeholder:text-muted-foreground focus:outline-none"
+                    />
                   </div>
                 )}
-                {skillsShown.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-soft">
-                      <Puzzle className="h-3.5 w-3.5 text-secondary" /> Skills
-                    </span>
-                    {skillsShown.map((s) => (
-                      <span key={s} className="animate-fade-in rounded-full border px-2 py-0.5 font-mono text-[10.5px]" style={{ borderColor: PATH_A + '55', color: PATH_A, background: PATH_A + '11' }}>{s}</span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
 
-            {/* related actions */}
-            {done && (
-              <div className="mt-4 animate-fade-in rounded-xl border border-border bg-card p-4">
-                <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-ink-soft">Related actions</p>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  <RelatedAction icon={Search} label="Check a specific customer rollover" onClick={() => start('b-robert')} />
-                  <RelatedAction icon={FileText} label="Find required forms" onClick={() => toast({ title: 'Forms guidance', description: 'IRA application, plan paperwork, rollover request form.', variant: 'info' })} />
-                  <RelatedAction icon={GitCompare} label="Compare direct vs indirect" onClick={replay} />
+                {/* streaming answer card */}
+                <div className="rounded-xl border border-border bg-card p-5">
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: PATH_A + '18', color: PATH_A }}>
+                      <Sparkles className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">{streaming ? 'Generating answer…' : 'General answer'}</span>
+                  </div>
+                  {shown.length === 0 ? (
+                    <div className="space-y-2" aria-hidden>
+                      <div className="h-3 w-11/12 animate-pulse rounded bg-muted" />
+                      <div className="h-3 w-full animate-pulse rounded bg-muted" />
+                      <div className="h-3 w-4/5 animate-pulse rounded bg-muted" />
+                    </div>
+                  ) : (
+                    <p className="whitespace-pre-line text-[14.5px] leading-relaxed text-ink">
+                      {shown}
+                      {streaming && <span className="ml-0.5 inline-block h-4 w-[2px] translate-y-0.5 animate-pulse bg-brand align-middle" />}
+                    </p>
+                  )}
+                  {done && scenario.caveat && (
+                    <div className="mt-4 flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5 animate-fade-in">
+                      <Info className="mt-0.5 h-4 w-4 shrink-0 text-secondary" />
+                      <p className="text-[12px] leading-relaxed text-muted-foreground">{scenario.caveat}</p>
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
+
+              {/* RIGHT rail — filled from t0 (skeletons while the agent works) */}
+              <div className="space-y-4">
+                {/* quick summary */}
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <div className="mb-2 flex items-center gap-1.5">
+                    <ListChecks className="h-3.5 w-3.5 text-secondary" />
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">Quick summary</span>
+                  </div>
+                  {done && scenario.quickSummary ? (
+                    <ul className="space-y-1.5 animate-fade-in">
+                      {scenario.quickSummary.map((b) => (
+                        <li key={b} className="flex gap-2 text-[12.5px] leading-snug text-ink">
+                          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: PATH_A }} />
+                          {b}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="space-y-2" aria-hidden>
+                      <div className="h-2.5 w-full animate-pulse rounded bg-muted" />
+                      <div className="h-2.5 w-5/6 animate-pulse rounded bg-muted" />
+                      <div className="h-2.5 w-11/12 animate-pulse rounded bg-muted" />
+                    </div>
+                  )}
+                </div>
+
+                {/* evidence: sources + skills (progressive) */}
+                <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+                  <div>
+                    <div className="mb-1.5 flex items-center gap-1.5">
+                      <BookText className="h-3.5 w-3.5 text-secondary" />
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">Sources</span>
+                    </div>
+                    {sourcesShown ? (
+                      <div className="flex flex-wrap gap-1.5 animate-fade-in">
+                        {scenario.ragSources.map((s) => (
+                          <span key={s.id} className="rounded-md border border-border bg-background/60 px-2 py-0.5 font-mono text-[10.5px] text-ink-soft">{s.id}</span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground">Gathering sources…</p>
+                    )}
+                  </div>
+                  <div>
+                    <div className="mb-1.5 flex items-center gap-1.5">
+                      <Puzzle className="h-3.5 w-3.5 text-secondary" />
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">Agent skills</span>
+                    </div>
+                    {skillsShown.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {skillsShown.map((s) => (
+                          <span key={s} className="animate-fade-in rounded-full border px-2 py-0.5 font-mono text-[10.5px]" style={{ borderColor: PATH_A + '55', color: PATH_A, background: PATH_A + '11' }}>{s}</span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground">Applying skills…</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* related actions (always available) */}
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-ink-soft">Related actions</p>
+                  <div className="space-y-2">
+                    <RelatedAction icon={Search} label="Check a specific customer rollover" onClick={() => start('b-robert')} />
+                    <RelatedAction icon={FileText} label="Find required forms" onClick={() => toast({ title: 'Forms guidance', description: 'IRA application, plan paperwork, rollover request form.', variant: 'info' })} />
+                    <RelatedAction icon={GitCompare} label="Compare direct vs indirect" onClick={replay} />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </main>
 

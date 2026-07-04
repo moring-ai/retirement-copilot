@@ -302,9 +302,10 @@ function DraftCompliance({ scenario }: { scenario: DemoScenario }) {
 
 // ── step: Associate Approval ────────────────────────────────────────────────────
 function Approval({ scenario }: { scenario: DemoScenario }) {
-  const { checklist, submitted, hitl, submit, decideHitl } = useDemo()
+  const { checklist, toggleChecklist, submitted, hitl, submit, decideHitl, phase } = useDemo()
   const items = scenario.reviewChecklist ?? []
   const allDone = items.every((i) => checklist[i.id])
+  const remaining = items.filter((i) => !checklist[i.id]).length
   const escalate = scenario.readiness === 'escalate'
   return (
     <div>
@@ -318,6 +319,47 @@ function Approval({ scenario }: { scenario: DemoScenario }) {
         <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">Draft preview</p>
         <p className="mt-1.5 text-sm leading-relaxed text-ink">{scenario.draft}</p>
       </div>
+
+      {/* Review queue — confirm these to unlock submission (right above the action) */}
+      <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3.5">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">Review queue</p>
+          {!escalate && (
+            <span className={cn('text-[11px] font-medium', allDone ? 'text-brand-dark' : 'text-muted-foreground')}>
+              {allDone ? 'all reviewed ✓' : `${remaining} to confirm`}
+            </span>
+          )}
+        </div>
+        <p className="mt-0.5 text-[12px] text-muted-foreground">
+          Auto items are ticked by the agent — confirm the rest to enable submission.
+        </p>
+        <div className="mt-2.5 flex flex-wrap gap-2">
+          {items.map((item) => {
+            const checked = !!checklist[item.id]
+            const locked = item.auto
+            return (
+              <button
+                key={item.id}
+                type="button"
+                disabled={locked || phase !== 'result'}
+                onClick={() => !locked && toggleChecklist(item.id)}
+                className={cn(
+                  'flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[12px] transition-colors',
+                  checked ? 'border-brand/40 bg-brand-soft/50 text-brand-dark' : 'border-border bg-card text-ink-soft hover:bg-muted',
+                  locked && 'cursor-default',
+                )}
+              >
+                <span className={cn('flex h-4 w-4 items-center justify-center rounded border', checked ? 'border-brand bg-brand text-white' : 'border-border')}>
+                  {checked && <Check className="h-3 w-3" />}
+                </span>
+                {item.label}
+                {locked && <span className="text-[9px] uppercase text-muted-foreground">auto</span>}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
       <div className="mt-5">
         {submitted ? (
           <div className="flex items-center gap-2 rounded-xl border border-brand/30 bg-brand-soft/50 px-4 py-3 text-sm font-medium text-brand-dark animate-fade-in">
@@ -347,7 +389,11 @@ function Approval({ scenario }: { scenario: DemoScenario }) {
             <Button size="lg" disabled={!allDone} onClick={submit}>
               <Send /> Submit for Review
             </Button>
-            {!allDone && <p className="mt-2 text-[12px] text-muted-foreground">Complete the review queue below to enable submission.</p>}
+            {!allDone && (
+              <p className="mt-2 text-[12px] text-muted-foreground">
+                Confirm the {remaining} remaining review item{remaining === 1 ? '' : 's'} above to enable submission.
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -449,41 +495,6 @@ function DecisionSummaryCard({ scenario }: { scenario: DemoScenario }) {
   )
 }
 
-function ReviewQueueCard({ scenario }: { scenario: DemoScenario }) {
-  const { checklist, toggleChecklist, phase } = useDemo()
-  return (
-    <Card title="Associate Review Queue">
-      <p className="mb-2.5 -mt-1 text-[12px] text-muted-foreground">
-        Auto items are ticked by the agent; confirm the rest before submitting.
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {(scenario.reviewChecklist ?? []).map((item) => {
-          const checked = !!checklist[item.id]
-          const locked = item.auto
-          return (
-            <button
-              key={item.id}
-              type="button"
-              disabled={locked || phase !== 'result'}
-              onClick={() => !locked && toggleChecklist(item.id)}
-              className={cn(
-                'flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[12px] transition-colors',
-                checked ? 'border-brand/40 bg-brand-soft/50 text-brand-dark' : 'border-border bg-card text-ink-soft hover:bg-muted',
-                (locked || phase !== 'result') && 'cursor-default',
-              )}
-            >
-              <span className={cn('flex h-4 w-4 items-center justify-center rounded border', checked ? 'border-brand bg-brand text-white' : 'border-border')}>
-                {checked && <Check className="h-3 w-3" />}
-              </span>
-              {item.label}
-              {locked && <span className="text-[9px] uppercase text-muted-foreground">auto</span>}
-            </button>
-          )
-        })}
-      </div>
-    </Card>
-  )
-}
 
 // ── the workspace ─────────────────────────────────────────────────────────────
 export function PathBWorkspace({ scenario }: { scenario: DemoScenario }) {
@@ -575,7 +586,7 @@ export function PathBWorkspace({ scenario }: { scenario: DemoScenario }) {
 
         {/* center */}
         <main className="scrollbar-slim min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-3xl px-5 pb-8">
+          <div className="mx-auto w-full max-w-4xl px-6 pb-8">
             {/* Case Action Bar */}
             <div className="sticky top-0 z-10 -mx-5 mb-5 flex flex-wrap items-center gap-2 border-b border-border bg-card/95 px-5 py-3 backdrop-blur">
               <Button size="sm" variant="outline" onClick={onSave} disabled={caseSaved}>
@@ -613,7 +624,6 @@ export function PathBWorkspace({ scenario }: { scenario: DemoScenario }) {
               </div>
 
               <DecisionSummaryCard scenario={scenario} />
-              <ReviewQueueCard scenario={scenario} />
             </div>
           </div>
         </main>
