@@ -9,13 +9,12 @@ acting. The copilot never talks to the customer autonomously and never moves mon
 
 A deterministic **front-door router** picks between two paths, and both converge on
 the same guardrails + response contract:
-- **Path A — Augmented LLM** (rollover question *about a specific customer*): live MCP
-  tool lookups + RAG + reasoning.
-- **Path B — Controlled Prompt Chain** (a *general* rollover explanation/checklist with
-  no specific customer): a fixed prompt chain over approved guidance, **no MCP tools**.
-
-The remaining future item — a skill-based validation chain replacing the lightweight
-guardrails — is scaffolded as a TODO (`backend/app/future/prompt_chain.py`).
+- **Path A — Augmented LLM** (a *general* rollover question, **no specific customer**):
+  a low-friction augmented LLM over **RAG + Agent Skills**, **no MCP/customer data**, no
+  human-in-the-loop — auto-runs to a reviewable draft ("Submit for Review").
+- **Path B — Controlled Prompt Chain** (rollover *about a specific customer*): a fixed
+  chain over **RAG + live MCP customer tools** with **guardrail checkpoints** — shows a
+  human-in-the-loop review UI when flags/escalations exist (e.g. CUST-2002 / Patricia).
 
 ```
 UI  →  FastAPI backend  →  LangGraph copilot graph  →  RAG (pgvector)
@@ -32,9 +31,10 @@ explanation, and **[DEMO_SCRIPT.md](DEMO_SCRIPT.md)** for a presentation walkthr
 
 | Layer | What it is | Where |
 |---|---|---|
-| **RAG** | Approved *static guidance* (SOPs, forms, tax boundaries, escalation policy), retrieved by similarity and **cited**. | `data/rag_docs/*.md` → pgvector |
-| **MCP tools** | *Per-customer system data* (profile, accounts, plan, restrictions, docs, dry-run case write). | `mcp_server/` |
-| **LangGraph** | Orchestration: 8 nodes, fixed path; the model only fills in content. | `backend/app/graph/` |
+| **RAG** | Approved *static guidance* (SOPs, forms, tax boundaries, escalation policy), retrieved by similarity and **cited**. Used by both paths. | `data/rag_docs/*.md` → pgvector |
+| **Agent Skills** | Versioned skills the copilot *applies* (clarification detection, rollover response style, approved customer-language policy) — **Path A**. Approved customer language lives here, not in RAG. | `backend/app/skills/` |
+| **MCP tools** | *Per-customer system data* (profile, accounts, plan, restrictions, docs, dry-run case write) — **Path B** only. | `mcp_server/` |
+| **LangGraph** | Orchestration: shared front + two paths + shared tail, fixed routing; the model only fills in content. | `backend/app/graph/` |
 | **Guardrails** | Deterministic safety checks (PII, advice/tax/trade boundaries, escalation). | `backend/app/guardrails/checks.py` |
 | **FastAPI** | The UI-facing API. | `backend/app/main.py` |
 
@@ -82,7 +82,7 @@ python scripts/seed_mock_data.py
 ### 4. Ingest the approved RAG docs into pgvector
 ```bash
 python scripts/ingest_docs.py
-# -> documents: 6, chunks: 32, embedding_mode: hash (or sentence-transformers)
+# -> documents: 5, chunks: 27, embedding_mode: hash (or sentence-transformers)
 ```
 
 ### 5. Start the MCP tool server (terminal A)
@@ -147,7 +147,9 @@ treat the top-level fields as the contract and `trace` as informational.
 
 ---
 
-## Example: successful customer scenario (CUST-1001 — clean path)
+## Example: successful customer scenario (CUST-1001 — clean path, Path B)
+
+Customer-specific → `path: "B_prompt_chain"` (Controlled Prompt Chain: RAG + 6 MCP tools).
 
 ```bash
 curl -s -X POST http://localhost:8080/chat -H "Content-Type: application/json" -d '{
@@ -180,7 +182,9 @@ Expected (abridged):
 }
 ```
 
-## Example: escalation scenario (CUST-2002)
+## Example: escalation scenario (CUST-2002 / Patricia — Path B, human review)
+
+Customer-specific → `path: "B_prompt_chain"`; guardrail flags trigger the human-in-the-loop review.
 
 ```bash
 curl -s -X POST http://localhost:8080/chat -H "Content-Type: application/json" -d '{
@@ -213,10 +217,11 @@ Expected (abridged):
 }
 ```
 
-## Example: standard explanation (Path B — no specific customer)
+## Example: general explanation (Path A — Augmented LLM, no specific customer)
 
-A general rollover question with **no `customer_id`** is routed to the prompt chain.
-Note `path: "B_prompt_chain"` and `tools_called: []` (Path B never touches customer systems).
+A general rollover question with **no `customer_id`** is routed to the augmented LLM
+(RAG + Agent Skills). Note `path: "A_augmented_llm"` and `tools_called: []` (Path A never
+touches customer systems).
 
 ```bash
 curl -s -X POST http://localhost:8080/chat -H "Content-Type: application/json" \
@@ -225,14 +230,15 @@ curl -s -X POST http://localhost:8080/chat -H "Content-Type: application/json" \
 Expected (abridged):
 ```json
 {
-  "path": "B_prompt_chain",
+  "path": "A_augmented_llm",
   "answer": "A standard 401(k)-to-IRA rollover typically requires the source plan's rollover/distribution paperwork, a Fidelity IRA application if no suitable IRA exists yet, and a Fidelity rollover request form... (Grounded in approved guidance: [ROLLOVER-SOP-01, FORMS-06, ...].)",
   "next_steps": ["Confirm whether the customer already holds a suitable Fidelity IRA; if not, open one first.", "..."],
   "required_forms": ["Fidelity IRA application (if a suitable IRA is not already open)", "..."],
   "escalation_required": false,
   "rag_sources": [ {"chunk_id": "ROLLOVER-SOP-01", "doc": "rollover_sop.md"}, ... ],
   "tools_called": [],
-  "trace": { "steps": [ "...", "pb_gate", "pb_explain", "pb_checklist", "..." ] }
+  "skills_used": [ {"skill": "clarification_detector", "kind": "content"}, {"skill": "rollover_response_style", "kind": "content"}, {"skill": "customer_language_policy", "kind": "content"}, "..." ],
+  "trace": { "steps": [ "...", "pa_gate", "skill:rollover_response_style", "pa_build_checklist", "skill:customer_language_policy", "..." ] }
 }
 ```
 

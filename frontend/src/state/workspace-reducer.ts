@@ -776,8 +776,9 @@ export function workspaceReducer(
 
     case 'INGEST_AGENT_RUN': {
       const { run } = action
-      // Path B (education) and non-customer runs never create an associate case.
-      if (run.path !== 'A_augmented_llm' || !run.caseId) return state
+      // Path A (general education) and non-customer runs never create an associate
+      // case — only Path B (customer-specific, MCP-backed) opens a servicing case.
+      if (run.path !== 'B_prompt_chain' || !run.caseId) return state
 
       const response = run.response
       const escalation = response.escalation_required

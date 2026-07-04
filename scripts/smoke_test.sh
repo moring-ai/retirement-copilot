@@ -33,13 +33,13 @@ _check "CUST-1001 present" "$r" 'CUST-1001'
 _check "CUST-2002 present" "$r" 'CUST-2002'
 
 echo ""
-echo "3) Clean scenario — CUST-1001 (Path A, no escalation)"
+echo "3) Clean scenario — CUST-1001 (Path B, no escalation)"
 r=$(curl -sf -X POST "$BASE_URL/chat" -H "Content-Type: application/json" -d '{
   "message": "Customer Robert Miller is a 65-year-old army veteran. He wants to roll over an old 401(k) into a Fidelity IRA. Check what is needed, whether he already has an IRA, restrictions, forms, and draft a compliant response.",
   "customer_id": "CUST-1001",
   "session_id": "demo-session-1"
 }')
-_check "routed to Path A" "$r" '"path":"A_augmented_llm"'
+_check "routed to Path B" "$r" '"path":"B_prompt_chain"'
 _check "no escalation"   "$r" '"escalation_required":false'
 _check "has rag sources" "$r" '"rag_sources"'
 _check "tools called"    "$r" 'get_customer_profile'
@@ -62,14 +62,15 @@ r=$(curl -sf -X POST "$BASE_URL/chat" -H "Content-Type: application/json" -d '{
 _check "clarification needed" "$r" '"clarification_needed":true'
 
 echo ""
-echo "6) Path B — general explanation (no customer, no MCP tools)"
+echo "6) Path A — general explanation (no customer, RAG + Agent Skills, no MCP tools)"
 r=$(curl -sf -X POST "$BASE_URL/chat" -H "Content-Type: application/json" -d '{
   "message": "Explain how a 401(k) to IRA rollover works and what forms are needed."
 }')
-_check "routed to Path B"   "$r" '"path":"B_prompt_chain"'
+_check "routed to Path A"   "$r" '"path":"A_augmented_llm"'
 _check "no tools called"    "$r" '"tools_called":\[\]'
-_check "no escalation (B)"  "$r" '"escalation_required":false'
-_check "has rag sources (B)" "$r" '"rag_sources"'
+_check "no escalation (A)"  "$r" '"escalation_required":false'
+_check "has rag sources (A)" "$r" '"rag_sources"'
+_check "used agent skills (A)" "$r" 'customer_language_policy'
 
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="

@@ -13,11 +13,13 @@ from app.config import settings
 from app.rag import embeddings, vector_store
 
 # Stable per-document prefixes for chunk ids.
+# NOTE: approved_customer_language.md is intentionally NOT here — approved
+# customer-facing language is now an Agent Skill (customer_language_policy), not
+# retrievable RAG knowledge. See backend/app/skills/agent_skills/.
 _DOC_PREFIX = {
     "rollover_sop.md": "ROLLOVER-SOP",
     "ira_opening_guidance.md": "IRA-OPEN",
     "required_forms_guidance.md": "FORMS",
-    "approved_customer_language.md": "APPROVED-LANG",
     "tax_advice_boundaries.md": "TAX-BOUNDARY",
     "escalation_policy.md": "ESCALATION",
 }

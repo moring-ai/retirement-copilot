@@ -25,11 +25,11 @@ class CopilotState(TypedDict, total=False):
     model_mode: str                   # "live" | "fallback"
     guardrails: dict[str, Any]        # output of run_guardrails
 
-    # --- Path B (Controlled Prompt Chain) ---
-    pb_topic: str                     # sub-topic chosen by the deterministic gate
-    pb_explanation: str               # chain step 1 output
-    pb_checklist: dict[str, Any]      # chain step 2 output {next_steps, required_forms}
-    chain_mode: str                   # "live" | "fallback" for the prompt chain
+    # --- Path A (Augmented LLM: RAG + Agent Skills, no MCP) ---
+    pa_topic: str                     # sub-topic chosen by the deterministic gate
+    pa_explanation: str               # explanation-skill output
+    pa_checklist: dict[str, Any]      # checklist-skill output {next_steps, required_forms}
+    chain_mode: str                   # "live" | "fallback" for the augmented-LLM skills
 
     skills_used: list[dict]           # [{skill, version, kind, status, flagged, detail}]
 

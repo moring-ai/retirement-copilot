@@ -10,7 +10,7 @@ backend + MCP server already running (see README steps 1–6).
 - MCP server running (`python mcp_server/server.py`)
 - Backend running (`uvicorn app.main:app --app-dir backend --port 8080`)
 - `curl -s localhost:8080/health | jq` → show `db: ok`, `mcp: ok (7 tools)`,
-  `corpus_chunks: 32`, `model_mode`.
+  `corpus_chunks: 27` (approved customer language is now an Agent Skill, not RAG), `model_mode`.
 
 > **Talking point:** "Everything is local and mock — no real Fidelity systems. The
 > copilot helps the *associate*, who stays in the loop. It never talks to the
@@ -27,7 +27,8 @@ advice."
 
 ---
 
-## 2. The clean scenario — CUST-1001 (2 min)
+## 2. The clean scenario — CUST-1001 (Path B) (2 min)
+> Customer-specific → the router picks **Path B — Controlled Prompt Chain** (RAG + MCP customer tools + guardrail checkpoints).
 Run:
 ```bash
 curl -s -X POST localhost:8080/chat -H "Content-Type: application/json" -d '{
@@ -53,7 +54,8 @@ Walk through the response top-to-bottom:
 
 ---
 
-## 3. The escalation scenario — CUST-2002 (1.5 min)
+## 3. The escalation scenario — CUST-2002 / Patricia (Path B, human review) (1.5 min)
+> Still Path B; guardrail flags surface the **human-in-the-loop review** controls.
 Run:
 ```bash
 curl -s -X POST localhost:8080/chat -H "Content-Type: application/json" -d '{
@@ -67,8 +69,8 @@ curl -s -X POST localhost:8080/chat -H "Content-Type: application/json" -d '{
 - **customer_draft** stays neutral and promises a specialist follow-up.
 
 > **Talking point:** "Same workflow, very different outcome — the **guardrails**
-> detected risk from the system data and forced an escalation instead of a
-> confident-but-wrong answer."
+> detected risk from the system data and routed to a **human review** instead of a
+> confident-but-wrong answer. The associate stays in control; nothing is sent."
 
 ---
 
@@ -83,26 +85,30 @@ curl -s -X POST localhost:8080/chat -H "Content-Type: application/json" -d '{
 
 ---
 
-## 5. Path B — the router picks the prompt chain (1.5 min)
+## 5. Path A — the router picks the Augmented LLM (1.5 min)
 Now ask a *general* question with **no customer**:
 ```bash
 curl -s -X POST localhost:8080/chat -H "Content-Type: application/json" \
   -d '{"message":"Explain how a 401(k) to IRA rollover works and what forms are needed."}' \
-  | jq '{path, tools_called, escalation_required, rag_sources: [.rag_sources[].chunk_id], steps: [.trace.steps[].step]}'
+  | jq '{path, tools_called, escalation_required, rag_sources: [.rag_sources[].chunk_id], skills: [.skills_used[].skill], steps: [.trace.steps[].step]}'
 ```
-- **path: "B_prompt_chain"** — "Same front door, different route. The router saw no
-  specific customer, so it chose the **Controlled Prompt Chain** instead of the
-  Augmented-LLM path."
-- **tools_called: []** — "Path B touches **no customer systems** — it answers purely
-  from approved guidance (RAG). That's the RAG-vs-MCP split in action."
-- **steps show `pb_gate → pb_explain → pb_build_checklist`** — "A fixed chain: a
-  deterministic gate (fail-fast if there's no grounding), then explain, then build the
-  checklist — each step feeds the next."
-- Same guardrails and same response contract as Path A (just `path` differs).
+- **path: "A_augmented_llm"** — "Same front door, different route. The router saw no
+  specific customer, so it chose the low-friction **Augmented LLM** (RAG + Agent Skills)
+  instead of the customer-data Prompt Chain."
+- **tools_called: []** — "Path A touches **no customer systems** — it answers purely
+  from approved guidance (RAG) + Agent Skills. That's the RAG-vs-MCP split in action."
+- **skills_used** — "The Agent Skills: `clarification_detector`, `rollover_response_style`,
+  and `customer_language_policy` (approved customer-safe language — now a *skill*, not a
+  RAG doc)."
+- **steps show `pa_gate → pa_explain → pa_build_checklist`** — "A fixed chain: a
+  deterministic gate (fail-fast if there's no grounding, or if the question is too sparse),
+  then explain, then build the checklist — each step feeds the next. No MCP, no
+  human-in-the-loop: it auto-runs to a reviewable draft."
+- Same guardrails and same response contract as Path B (just `path` differs).
 
-> **Talking point:** "Customer-specific → Path A (live data + reasoning). Standard
-> explanation → Path B (predictable, cheaper, no system access). One router, one
-> contract, two engines."
+> **Talking point:** "General question → Path A (augmented LLM: RAG + Agent Skills,
+> predictable, cheaper, no system access). Customer-specific → Path B (controlled prompt
+> chain: live data + guardrail checkpoints). One router, one contract, two engines."
 
 ---
 

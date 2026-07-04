@@ -11,12 +11,14 @@ const STEP_LABEL: Record<string, string> = {
   parse_user_request: 'parse',
   classify_request: 'classify · ROUTER',
   retrieve_rag_documents: 'retrieve_rag',
+  // Path A — Augmented LLM (RAG + Agent Skills)
+  pa_gate: 'pa_gate',
+  pa_explain: 'pa_explain',
+  pa_build_checklist: 'pa_build_checklist',
+  // Path B — Controlled Prompt Chain (RAG + MCP customer data)
   decide_required_tools: 'decide_tools',
   call_mcp_tools: 'call_mcp_tools',
   synthesize_rollover_plan: 'synthesize',
-  pb_gate: 'pb_gate',
-  pb_explain: 'pb_explain',
-  pb_checklist: 'pb_checklist',
   guardrails_check: 'guardrails',
   format_final_response: 'format',
 }
@@ -61,9 +63,9 @@ export function Backstage({
   const escalation = !!r?.escalation_required
 
   const gloss = isA
-    ? 'This customer, this account → the agent looks up their real records.'
+    ? 'General question → augmented LLM over approved guidance + Agent Skills, no personal data.'
     : isB
-      ? 'General question → the agent explains what’s allowed, no personal data.'
+      ? 'This customer, this account → controlled chain calls MCP for their real records.'
       : 'Not a routed rollover request → clarification.'
 
   return (
@@ -157,12 +159,12 @@ export function Backstage({
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <EngineCard
                   title="Augmented LLM"
-                  sub="RAG + MCP tools"
+                  sub="RAG + Agent Skills"
                   lit={isA}
                 />
                 <EngineCard
-                  title="Prompt-chain"
-                  sub="RAG + skills"
+                  title="Controlled Prompt Chain"
+                  sub="RAG + MCP customer data"
                   lit={isB}
                 />
               </div>
@@ -203,7 +205,7 @@ export function Backstage({
                 ))}
               </EvidenceGroup>
 
-              {isA && (
+              {isB && (
                 <EvidenceGroup title={`MCP tools (${r.tools_called.length})`}>
                   {r.tools_called.map((t) => (
                     <span key={t.tool} className="mono rounded bg-[#e7f3ec] px-1.5 py-0.5 text-[10px] text-[#0a5c3b]">

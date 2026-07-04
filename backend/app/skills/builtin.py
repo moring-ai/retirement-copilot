@@ -1,23 +1,43 @@
-"""Built-in skills — the single home for Path B content logic + validation reporters.
+"""Built-in skills — the single home for Path A content logic + validation reporters.
 
-Content skills hold the RAG-grounded prompt-chain logic moved verbatim out of
-``graph/path_b.py`` (same prompts, same deterministic fallbacks), so Path B is
-now literally "RAG + skills". Validation skills are thin reporters over the
-already-computed deterministic guardrails result (they do NOT re-decide anything
-— ``run_guardrails`` stays the single source of truth), recorded for the audit
-trail so the chain reads end-to-end.
+Content skills power **Path A — Augmented LLM (RAG + Agent Skills, no MCP)**: the
+RAG-grounded explanation/checklist prompt-chain plus the named Agent Skills
+(``clarification_detector``, ``rollover_response_style``, ``customer_language_policy``).
+Validation skills are thin reporters over the already-computed deterministic
+guardrails result (they do NOT re-decide anything — ``run_guardrails`` stays the
+single source of truth), recorded for the audit trail so the chain reads
+end-to-end (used by both paths in the shared tail).
+
+Some Agent Skills carry their policy as a markdown file under
+``skills/agent_skills/`` (e.g. ``customer_language_policy.md``) — approved content
+that used to live in the RAG corpus but is a *skill*, not retrievable knowledge.
 
 Importing this module registers every skill as a side effect.
 """
 from __future__ import annotations
 
 import json
+from functools import lru_cache
+from pathlib import Path
 
 from app.llm import client as llm_client
 from app.skills.registry import SkillResult, register
 
+# Agent Skill policy files (markdown) live next to this module.
+_AGENT_SKILLS_DIR = Path(__file__).resolve().parent / "agent_skills"
+
+
+@lru_cache(maxsize=None)
+def _load_agent_skill(name: str) -> str:
+    """Load an Agent Skill's markdown policy (e.g. ``customer_language_policy``)."""
+    path = _AGENT_SKILLS_DIR / f"{name}.md"
+    try:
+        return path.read_text()
+    except OSError:
+        return ""
+
 # ---------------------------------------------------------------------------
-# Content skills (Path B — RAG + skills)
+# Content skills (Path A — Augmented LLM: RAG + Agent Skills)
 # ---------------------------------------------------------------------------
 
 _TOPIC_KEYWORDS = [
@@ -39,11 +59,29 @@ def _citations(chunks: list[dict]) -> list[str]:
     return [c["chunk_id"] for c in chunks]
 
 
-@register("pb_topic_select", "1.0.0", "content",
-          "Deterministic rollover sub-topic selection for the prompt chain.")
+@register("clarification_detector", "1.0.0", "content",
+          "Agent Skill: detects when a general rollover question lacks enough detail to answer.")
+def _skill_clarification_detector(state: dict, ctx: dict) -> SkillResult:
+    """Deterministic sufficiency check for the general (Path A) question. Flags
+    only genuinely sparse prompts so the happy path auto-runs without friction."""
+    message = state.get("message", "").strip()
+    words = [w for w in message.split() if w.strip()]
+    # A bare keyword or two ("rollover", "401k rollover") is too thin to explain well.
+    too_sparse = len(words) <= 2
+    if too_sparse:
+        state["clarification_message"] = (
+            "Could you add a little more detail about the rollover topic you'd like "
+            "explained (e.g. direct vs. indirect, required forms, or opening an IRA)?"
+        )
+        return SkillResult(note="question too sparse -> request more detail", flagged=True)
+    return SkillResult(note="question has enough detail to answer", flagged=False)
+
+
+@register("pa_topic_select", "1.0.0", "content",
+          "Deterministic rollover sub-topic selection for the augmented-LLM chain.")
 def _skill_topic_select(state: dict, ctx: dict) -> SkillResult:
     topic = _classify_topic(state.get("message", ""))
-    state["pb_topic"] = topic
+    state["pa_topic"] = topic
     return SkillResult(outputs={"topic": topic}, note=f"topic={topic}")
 
 
@@ -92,11 +130,11 @@ def _fallback_explanation(topic: str, chunks: list[dict]) -> str:
     return f"{lead} (Grounded in approved guidance: [{cited}].)"
 
 
-@register("pb_explain", "1.0.0", "content",
-          "RAG-grounded plain-language explanation of the rollover sub-topic.")
+@register("rollover_response_style", "1.0.0", "content",
+          "Agent Skill: RAG-grounded, clearly formatted plain-language rollover explanation.")
 def _skill_explain(state: dict, ctx: dict) -> SkillResult:
     chunks = state.get("rag_chunks", [])
-    topic = state.get("pb_topic", "general_steps")
+    topic = state.get("pa_topic", "general_steps")
     guidance = "\n".join(
         f"[{c['chunk_id']}] ({c['doc_name']}) {c['content']}" for c in chunks
     )
@@ -109,7 +147,7 @@ def _skill_explain(state: dict, ctx: dict) -> SkillResult:
     text, mode = llm_client.prompt_chain_step(
         _EXPLAIN_SYSTEM, user, _fallback_explanation(topic, chunks)
     )
-    state["pb_explanation"] = text
+    state["pa_explanation"] = text
     state["chain_mode"] = mode
     return SkillResult(outputs={"explanation": text}, note=f"explanation (mode={mode})")
 
@@ -147,11 +185,11 @@ def _build_customer_draft() -> str:
     )
 
 
-@register("pb_checklist", "1.0.0", "content",
+@register("pa_checklist", "1.0.0", "content",
           "RAG-grounded standard next-steps + required-forms checklist.")
 def _skill_checklist(state: dict, ctx: dict) -> SkillResult:
     chunks = state.get("rag_chunks", [])
-    explanation = state.get("pb_explanation", "")
+    explanation = state.get("pa_explanation", "")
     fallback_json = json.dumps(
         {"next_steps": _FALLBACK_NEXT_STEPS, "required_forms": _FALLBACK_FORMS}
     )
@@ -168,12 +206,13 @@ def _skill_checklist(state: dict, ctx: dict) -> SkillResult:
         next_steps, required_forms = _FALLBACK_NEXT_STEPS, _FALLBACK_FORMS
         mode = "fallback"
 
-    state["pb_checklist"] = {"next_steps": next_steps, "required_forms": required_forms}
+    state["pa_checklist"] = {"next_steps": next_steps, "required_forms": required_forms}
     if mode == "fallback":
         state["chain_mode"] = "fallback"
 
-    # Assemble the synthesis dict in the SAME shape Path A produces, so the shared
-    # guardrails_check + format_final_response nodes handle the tail unchanged.
+    # Assemble the synthesis dict in the SAME shape the Path B synthesize node
+    # produces, so the shared guardrails_check + format_final_response tail is
+    # unchanged. The customer_language_policy skill (next) shapes the draft.
     state["synthesis"] = {
         "answer": explanation,
         "case_summary": "Standard 401(k)-to-IRA rollover explanation (general guidance; no specific customer).",
@@ -189,6 +228,47 @@ def _skill_checklist(state: dict, ctx: dict) -> SkillResult:
         outputs={"next_steps": next_steps, "required_forms": required_forms},
         note=f"checklist ({len(next_steps)} steps, mode={state['model_mode']})",
     )
+
+
+# Deterministic "phrasings to avoid" from the approved-language Agent Skill — kept
+# in sync with skills/agent_skills/customer_language_policy.md. The customer draft
+# Path A produces is already approved language, so this normally passes clean; the
+# check exists so the skill is a real gate, not a rubber stamp.
+_AVOID_PHRASES = (
+    "you should invest",
+    "i recommend buying",
+    "we recommend buying",
+    "tax-free",
+    "guarantee",
+    "guaranteed",
+    "has been moved",
+    "will be moved automatically",
+    "funds have been moved",
+)
+
+
+@register("customer_language_policy", "1.0.0", "content",
+          "Agent Skill: enforce approved, customer-safe tone/language on the customer draft.")
+def _skill_customer_language(state: dict, ctx: dict) -> SkillResult:
+    """Loads the approved-language Agent Skill (markdown) and checks the customer
+    draft against its 'phrasings to avoid'. This is the skill that replaced the
+    old ``approved_customer_language`` RAG document — approved language is a
+    *policy the copilot applies*, not knowledge it retrieves."""
+    policy = _load_agent_skill("customer_language_policy")
+    draft = state.get("synthesis", {}).get("customer_draft", "")
+    low = draft.lower()
+    hits = [p for p in _AVOID_PHRASES if p in low]
+    loaded = bool(policy)
+    if hits:
+        # Flag for the audit trail; guardrails remain the authoritative redactor.
+        note = f"draft contains disallowed phrasing: {', '.join(hits)}"
+        return SkillResult(note=note, flagged=True)
+    note = (
+        "customer draft conforms to approved language policy"
+        if loaded
+        else "approved-language policy file missing; draft not policy-checked"
+    )
+    return SkillResult(note=note, flagged=not loaded)
 
 
 # ---------------------------------------------------------------------------

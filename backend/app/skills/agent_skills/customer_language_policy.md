@@ -1,4 +1,9 @@
-# Approved Customer-Facing Language
+# Agent Skill: customer_language_policy
+
+**Kind:** content · **Applies to:** Path A (Augmented LLM) and any customer-facing draft
+**Purpose:** Ensure every customer-facing draft uses approved, customer-safe tone and
+language. This is a *policy the copilot applies to its own output* — not retrievable
+knowledge — which is why it lives here as an Agent Skill rather than in the RAG corpus.
 
 ## Principles
 Customer-facing language must be neutral, factual, and free of personalized
@@ -25,3 +30,9 @@ the customer what to buy, how to allocate, or guarantee outcomes.
 ## Tone
 Helpful, plain-language, and clearly framed as assistance the associate is
 offering — never as the system making promises or executing actions on its own.
+
+## How this skill is applied
+The `customer_language_policy` skill (see `backend/app/skills/builtin.py`) loads this
+file and checks the assembled customer draft against the "Phrasings to avoid" list,
+recording the result in the `skills_used[]` audit trail. The authoritative PII
+redaction and advice/tax/trade guardrails still run in `guardrails/checks.py`.

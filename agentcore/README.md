@@ -16,8 +16,8 @@ runtime** that shows up in the AICP portal (traffic flows through its AI gateway
 
 The copilot's dual-backend design means it works even with **no LLM key** (the
 deterministic template synthesizer runs and the smoke test still passes); with a
-gateway virtual key wired in, Path A synthesis and Path B's two prompt-chain
-steps run live and are traced in the portal (tagged `agent:retirement-copilot`).
+gateway virtual key wired in, Path A's Agent-Skill steps and Path B's synthesis
+run live and are traced in the portal (tagged `agent:retirement-copilot`).
 
 ## Contract
 
@@ -29,8 +29,8 @@ it's also parsed out of the prompt).
 `escalation_required`, `escalation_reasons`, `rag_sources`, `tools_called`, `trace`.
 
 The front-door router picks the path:
-- **Path A — Augmented LLM**: rollover + a specific customer → live MCP tool calls + grounded synthesis.
-- **Path B — Controlled Prompt Chain**: rollover, no customer → explain → checklist over approved guidance, no MCP.
+- **Path A — Augmented LLM**: rollover, no specific customer → RAG + Agent Skills, no MCP; auto-runs to a reviewable draft.
+- **Path B — Controlled Prompt Chain**: rollover + a specific customer → live MCP tool calls + grounded synthesis + guardrail checkpoints (human review on escalation).
 - Customer-specific ask with no identifier → clarification.
 
 ## Deploy
@@ -66,5 +66,6 @@ BASE_URL=http://localhost:8080 bash smoke_test.sh
 AGENT_RUNTIME_ARN=<arn> bash smoke_test.sh
 ```
 
-The smoke test covers all three router paths (clean Path A, escalating Path A on
-CUST-2002, Path B general explanation) plus the clarification short-circuit.
+The smoke test covers all three router outcomes (clean Path B on CUST-1001,
+escalating Path B on CUST-2002, Path A general explanation) plus the clarification
+short-circuit.

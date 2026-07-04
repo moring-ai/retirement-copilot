@@ -53,27 +53,28 @@ if [ -z "$AGENT_RUNTIME_ARN" ]; then
 fi
 
 echo ""
-echo "3) Path A (Augmented LLM) — clean customer CUST-1001, full chain + MCP tools"
+echo "3) Path B (Controlled Prompt Chain) — clean customer CUST-1001, full chain + MCP tools"
 r=$(_invoke '{"prompt":"Help me handle a 401k rollover for customer CUST-1001","customer_id":"CUST-1001"}')
-_check "path A"            "$r" '"path":"A_augmented_llm"'
+_check "path B"            "$r" '"path":"B_prompt_chain"'
 _check "tools_called"      "$r" '"get_customer_profile"'
 _check "rag_sources cited" "$r" 'ROLLOVER-SOP'
 _check "no escalation"     "$r" '"escalation_required":false'
 _check "next_steps present" "$r" '"next_steps"'
 
 echo ""
-echo "4) Path A (Augmented LLM) — CUST-2002 triggers escalation"
+echo "4) Path B (Controlled Prompt Chain) — CUST-2002 triggers escalation"
 r=$(_invoke '{"prompt":"Process a 401k to IRA rollover for customer CUST-2002","customer_id":"CUST-2002"}')
-_check "path A"          "$r" '"path":"A_augmented_llm"'
+_check "path B"          "$r" '"path":"B_prompt_chain"'
 _check "escalation true" "$r" '"escalation_required":true'
 _check "escalation reasons" "$r" '"escalation_reasons"'
 
 echo ""
-echo "5) Path B (Controlled Prompt Chain) — general question, no customer, no MCP tools"
+echo "5) Path A (Augmented LLM) — general question, no customer, RAG + Agent Skills, no MCP tools"
 r=$(_invoke '{"prompt":"Explain the difference between a direct and indirect 401k to IRA rollover"}')
-_check "path B"          "$r" '"path":"B_prompt_chain"'
+_check "path A"          "$r" '"path":"A_augmented_llm"'
 _check "no tools called" "$r" '"tools_called":\[\]'
 _check "cited guidance"  "$r" 'ROLLOVER-SOP'
+_check "agent skills used" "$r" 'rollover_response_style'
 
 echo ""
 echo "6) Clarification — no customer identifier on a customer-specific ask"

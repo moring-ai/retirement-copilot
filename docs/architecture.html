@@ -148,6 +148,21 @@
     align-items:center;gap:6px;flex-wrap:wrap;justify-content:center;padding:3px 10px}
   .fc-merge{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;padding:12px 0 2px}
   .cap{font-size:12.5px;color:var(--muted);text-align:center;margin-top:16px;font-style:italic;max-width:none}
+  /* self-explaining bits */
+  .fc-subtitle{width:100%;text-align:center;font-family:var(--sans);font-size:11px;line-height:1.45;
+    font-weight:500;padding:0 14px 12px;margin-top:-4px}
+  .fc-sub.a .fc-subtitle{color:var(--accent-deep)}
+  .fc-sub.b .fc-subtitle{color:#264A78}
+  .fc-gatetag{font-family:var(--mono);font-size:9.5px;letter-spacing:.03em;color:var(--muted);
+    text-align:center;max-width:300px;padding:4px 8px 0}
+  .fc-contrast{display:grid;grid-template-columns:1fr 1fr;gap:16px;width:100%;margin-top:20px}
+  .fc-contrast > div{border-radius:10px;padding:12px 14px;font-size:12px;line-height:1.5}
+  .fc-contrast .ch{font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;
+    font-weight:700;margin-bottom:6px}
+  .fc-contrast .ca{background:var(--accent-soft);color:var(--accent-deep)}
+  .fc-contrast .cb{background:var(--pathb-soft);color:#264A78}
+  .fc-contrast b{font-weight:660}
+  @media (max-width:680px){.fc-contrast{grid-template-columns:1fr}}
 
   /* ---------- flow cards ---------- */
   .flow{background:var(--surface);border:1px solid var(--line);border-radius:14px;
@@ -242,14 +257,14 @@
       <p>The associate sends one free-text request. A deterministic <strong>router</strong> reads it and picks one of two engines; both finish at the same guardrails and the same response shape. The copilot drafts an <strong>associate-ready</strong> answer — case summary, findings, next steps, required forms, a customer-facing draft, compliance notes, and escalation flags — that the associate reviews before acting. It does not give investment or tax advice, and it never moves money or executes trades.</p>
       <div class="note">
         <span class="lbl">The one-sentence model</span>
-        One request → <strong>router</strong> → <strong>Path A</strong> (live customer data + reasoning) <em>or</em> <strong>Path B</strong> (standard explanation from approved guidance) → <strong>guardrails</strong> → associate-ready JSON.
+        One request → <strong>router</strong> → <strong>Path A</strong> (general explanation from approved guidance + Agent Skills, no customer data) <em>or</em> <strong>Path B</strong> (customer-specific: live MCP data + guardrail checkpoints) → <strong>guardrails</strong> → associate-ready JSON.
       </div>
     </section>
 
     <section id="flow">
       <span class="sec-num">02</span>
       <h2>The flow at a glance</h2>
-      <p>One request enters at <code>POST /chat</code>, a deterministic router sends it down Path A or Path B, and both converge on the same code-only guardrails and the same response. Blue nodes are LLM steps; amber nodes are clarification off-ramps.</p>
+      <p>One request enters at <code>POST /chat</code>, a deterministic router sends it down Path A or Path B, and both converge on the same code-only guardrails and the same response. <strong>Both are deterministic chains</strong> — what differs is what each gate tests and how far the chain can go: Path A gates on the <em>request itself</em> and augments a single answer; Path B gates on <em>live customer data</em> fetched mid-chain and can hand off to a person. Blue nodes are LLM steps; amber nodes are clarification / human off-ramps.</p>
 
       <div class="diagram-card" role="img" aria-label="LangGraph flow: router dispatches to Path A or Path B, both converging on guardrails and a governed response.">
         <div class="flowchart">
@@ -261,48 +276,67 @@
           <div class="fc-arrow">↓</div>
           <div class="fc-dec">classify — ROUTER (deterministic)</div>
           <div class="fc-routes">
-            <span class="fc-route a">rollover + customer-specific</span>
-            <span class="fc-route a">not a rollover (other)</span>
-            <span class="fc-route b">rollover + general</span>
+            <span class="fc-route a">rollover + general</span>
+            <span class="fc-route">not a rollover (other)</span>
+            <span class="fc-route b">rollover + customer-specific</span>
           </div>
 
           <div class="fc-paths">
-            <!-- Path A -->
+            <!-- Path A — Augmented LLM (RAG + Agent Skills, no MCP) -->
             <div class="fc-sub a">
-              <div class="fc-title">Path A — Augmented LLM · live customer data</div>
+              <div class="fc-title">Path A — Augmented LLM · RAG + Agent Skills · no customer data</div>
+              <div class="fc-subtitle">One answer, augmented in fixed steps. Every step reads only the query + approved guidance + Agent Skills — nothing external, no human step.</div>
+              <div class="fc-node">retrieve_rag — pgvector top-k</div>
+              <div class="fc-arrow">↓</div>
+              <div class="fc-dec">pa_gate — grounded? enough detail?</div>
+              <div class="fc-gatetag">↑ input gate — tests the request itself</div>
+              <div class="fc-fork">no chunks / too sparse → <span class="fc-node clar sm">needs_clarification</span></div>
+              <div class="fc-arrow"><span class="fc-lbl">grounded · pick sub-topic</span>↓</div>
+              <div class="fc-node llm">pa_explain (LLM) — rollover_response_style</div>
+              <div class="fc-arrow">↓</div>
+              <div class="fc-node llm">pa_build_checklist — steps + forms + customer_language_policy</div>
+              <div class="fc-arrow">↓</div>
+              <div class="fc-node sm">auto-run → Submit for Review (no human-in-the-loop)</div>
+            </div>
+
+            <!-- Path B — Controlled Prompt Chain (RAG + MCP customer data) -->
+            <div class="fc-sub b">
+              <div class="fc-title">Path B — Controlled Prompt Chain · RAG + MCP customer data</div>
+              <div class="fc-subtitle">A workflow decomposed into stages. Each gate tests live customer data fetched mid-chain — any check can stop the chain or route it to a person.</div>
               <div class="fc-node">retrieve_rag — pgvector top-k</div>
               <div class="fc-arrow">↓</div>
               <div class="fc-dec">decide_tools — customer-specific?</div>
-              <div class="fc-fork">no identifier / other → <span class="fc-node clar sm">needs_clarification</span></div>
+              <div class="fc-gatetag">↑ state gate — needs a real customer to look up</div>
+              <div class="fc-fork">no identifier → <span class="fc-node clar sm">needs_clarification</span></div>
               <div class="fc-arrow"><span class="fc-lbl">yes</span>↓</div>
               <div class="fc-node">call_tools — all 6 read MCP tools (fixed list)</div>
               <div class="fc-fork">customer not found → <span class="fc-node clar sm">needs_clarification</span></div>
               <div class="fc-arrow"><span class="fc-lbl">found</span>↓</div>
-              <div class="fc-node llm">synthesize (LLM) — rollover plan</div>
-            </div>
-
-            <!-- Path B -->
-            <div class="fc-sub b">
-              <div class="fc-title">Path B — Controlled Prompt Chain · no customer data</div>
-              <div class="fc-node">retrieve_rag — pgvector top-k</div>
+              <div class="fc-node llm">synthesize (LLM) — customer rollover draft</div>
               <div class="fc-arrow">↓</div>
-              <div class="fc-dec">pb_gate — RAG grounded?</div>
-              <div class="fc-fork">no chunks (fail-fast) → <span class="fc-node clar sm">needs_clarification</span></div>
-              <div class="fc-arrow"><span class="fc-lbl">grounded · pick sub-topic</span>↓</div>
-              <div class="fc-node llm">pb_explain (LLM step 1)</div>
-              <div class="fc-arrow">↓</div>
-              <div class="fc-node llm">pb_checklist (LLM step 2) — steps + forms</div>
+              <div class="fc-node clar sm">guardrail flags / escalation → human review</div>
+              <div class="fc-gatetag">↑ state gate — restrictions / disputes / KYC in the data</div>
             </div>
           </div>
 
-          <div class="fc-merge">Path A (synthesize) · Path B (pb_checklist) · clarifications ↓</div>
+          <div class="fc-merge">Path A (pa_build_checklist) · Path B (synthesize) · clarifications ↓</div>
           <div class="fc-node wide">guardrails_check — code-only safety layer</div>
           <div class="fc-arrow">↓</div>
           <div class="fc-node wide">format_final_response</div>
           <div class="fc-arrow">↓</div>
           <div class="fc-node out">ChatResponse JSON → UI</div>
         </div>
-        <p class="cap">Actual implemented LangGraph flow: deterministic router → Path A (MCP + LLM) / Path B (prompt chain) → shared code guardrails → governed response.</p>
+        <div class="fc-contrast" role="note" aria-label="How the two paths differ">
+          <div class="ca">
+            <div class="ch">Path A gates on the request</div>
+            <b>Augmented LLM.</b> Steps augment <em>one</em> answer with RAG + Agent Skills. Nothing external is read, so there's nothing to escalate — it auto-runs to a reviewable draft.
+          </div>
+          <div class="cb">
+            <div class="ch">Path B gates on live state</div>
+            <b>Controlled prompt chain.</b> Each stage checks per-customer data fetched mid-chain (found? restricted? disputed?). Any check can halt the chain or route it to a human.
+          </div>
+        </div>
+        <p class="cap">Same graph shape, two governance postures: Path A augments a single answer (no customer data, no human step); Path B decomposes into stages with checkpoints on live customer data → governed response.</p>
       </div>
 
       <h3>Every entity in the flow</h3>
@@ -315,12 +349,12 @@
             <tr><td><code>parse</code></td><td>Deterministic regex extraction of a customer id (<code>CUST-####</code>), a customer name, and rollover keywords.</td></tr>
             <tr><td><code>classify</code> (ROUTER)</td><td>Deterministic decision — sets the path from intent + whether a specific customer is named. No model call.</td></tr>
             <tr><td><code>retrieve_rag</code></td><td>pgvector cosine top-k over the approved guidance corpus. Runs on both paths so every answer is grounded and cited.</td></tr>
-            <tr><td><code>decide_tools</code> (Path A)</td><td>Decision: is the request customer-specific? If not, off-ramp to clarification; if yes, queue the read tools.</td></tr>
-            <tr><td><code>call_tools</code> (Path A)</td><td>Calls all 6 read-only MCP tools (profile, IRA, accounts, source plan, restrictions, documents). If the customer isn't found, off-ramp to clarification.</td></tr>
-            <tr><td><code>synthesize</code> (Path A · LLM)</td><td>Turns RAG guidance + live tool data into the structured rollover plan (OpenAI, or the deterministic offline fallback).</td></tr>
-            <tr><td><code>pb_gate</code> (Path B)</td><td>Validation gate: fail-fast to clarification if no guidance was retrieved; otherwise pick a sub-topic. Demonstrates the prompt-chain gate.</td></tr>
-            <tr><td><code>pb_explain</code> (Path B · LLM)</td><td>Chain step 1 — a plain-language, cited explanation grounded in the retrieved chunks.</td></tr>
-            <tr><td><code>pb_checklist</code> (Path B · LLM)</td><td>Chain step 2 — consumes the explanation and produces the standard next-steps + required forms.</td></tr>
+            <tr><td><code>pa_gate</code> (Path A)</td><td>Validation gate: fail-fast to clarification if no guidance was retrieved; runs the <code>clarification_detector</code> Agent Skill (off-ramp if the question is too sparse); otherwise pick a sub-topic.</td></tr>
+            <tr><td><code>pa_explain</code> (Path A · LLM)</td><td>The <code>rollover_response_style</code> Agent Skill — a plain-language, cited explanation grounded in the retrieved chunks. No customer data.</td></tr>
+            <tr><td><code>pa_build_checklist</code> (Path A · LLM)</td><td>Standard next-steps + required forms, then the <code>customer_language_policy</code> Agent Skill shapes the customer draft in approved language. Auto-runs to a reviewable draft — no human-in-the-loop.</td></tr>
+            <tr><td><code>decide_tools</code> (Path B)</td><td>Decision: is the request customer-specific? If not, off-ramp to clarification; if yes, queue the read tools.</td></tr>
+            <tr><td><code>call_tools</code> (Path B)</td><td>Calls all 6 read-only MCP tools (profile, IRA, accounts, source plan, restrictions, documents) and validates the customer. If not found, off-ramp to clarification.</td></tr>
+            <tr><td><code>synthesize</code> (Path B · LLM)</td><td>Turns RAG guidance + live tool data into the structured customer rollover draft (OpenAI, or the deterministic offline fallback). Guardrail flags route to human review.</td></tr>
             <tr><td><code>needs_clarification</code></td><td>An off-ramp shared by both paths — asks the associate for a valid identifier or notes missing grounding, instead of guessing.</td></tr>
             <tr><td><code>guardrails_check</code></td><td>Code-only safety pass on both paths: PII redaction, advice/tax/trade checks, escalation decision, grounding check.</td></tr>
             <tr><td><code>format_final_response</code></td><td>Assembles the API payload (incl. the chosen <code>path</code>); guardrails own the authoritative compliance + escalation fields.</td></tr>
@@ -413,14 +447,14 @@
       </div>
       <div class="note">
         <span class="lbl">Why it matters for the paths</span>
-        Path A uses <strong>both</strong> (guidance + live data). Path B uses <strong>RAG only</strong> and calls <em>no</em> MCP tools — which is exactly why its response shows <code>tools_called: []</code>.
+        Path B (customer-specific) uses <strong>both</strong> (guidance + live data). Path A (general) uses <strong>RAG + Agent Skills</strong> and calls <em>no</em> MCP tools — which is exactly why its response shows <code>tools_called: []</code>. Approved customer-facing language is <em>not</em> in RAG at all — it is the <code>customer_language_policy</code> Agent Skill.
       </div>
     </section>
 
     <section id="mcp">
       <span class="sec-num">06</span>
       <h2>MCP tools &amp; data stores</h2>
-      <p>The MCP server (<code>mcp_server/server.py</code>, FastMCP over streamable-HTTP on <code>:8100</code>) exposes <strong>seven</strong> tools. Six are read-only and are the fixed list Path A calls on every customer-specific request; the seventh is a dry-run write that is <em>exposed but never auto-invoked</em> by the graph. Each takes a single <code>identifier</code> (a <code>CUST-####</code> id or a full/partial name) and returns a structured record — or <code>{ "found": false, … }</code> for an unknown id.</p>
+      <p>The MCP server (<code>mcp_server/server.py</code>, FastMCP over streamable-HTTP on <code>:8100</code>) exposes <strong>seven</strong> tools. Six are read-only and are the fixed list Path B calls on every customer-specific request; the seventh is a dry-run write that is <em>exposed but never auto-invoked</em> by the graph. Each takes a single <code>identifier</code> (a <code>CUST-####</code> id or a full/partial name) and returns a structured record — or <code>{ "found": false, … }</code> for an unknown id.</p>
 
       <div class="note" style="border-left-color:var(--crit)">
         <span class="lbl" style="color:var(--crit)">Which database? — none, for the tools</span>
@@ -500,7 +534,7 @@
           </tbody>
         </table>
       </div>
-      <p style="font-size:15px">On Path A, <code>call_mcp_tools</code> invokes the <strong>six read tools</strong> as a fixed batch (that's the <code>6 tools</code> you see in <code>tools_called</code>). An unknown identifier returns <code>{ "found": false, "message": … }</code>, which short-circuits the graph to a clarification rather than guessing.</p>
+      <p style="font-size:15px">On Path B, <code>call_mcp_tools</code> invokes the <strong>six read tools</strong> as a fixed batch (that's the <code>6 tools</code> you see in <code>tools_called</code>). An unknown identifier returns <code>{ "found": false, "message": … }</code>, which short-circuits the graph to a clarification rather than guessing.</p>
     </section>
 
     <section id="router">
@@ -511,8 +545,8 @@
         <table>
           <thead><tr><th>Request looks like…</th><th>Path chosen</th><th>Why</th></tr></thead>
           <tbody>
-            <tr><td>Rollover question <strong>+ a specific customer</strong> (id or name)</td><td><span class="pill no">A_augmented_llm</span></td><td>Needs live account data → MCP + RAG + reasoning</td></tr>
-            <tr><td>Rollover question <strong>with no specific customer</strong></td><td><span class="pill" style="background:var(--pathb-soft);color:#264a78">B_prompt_chain</span></td><td>A standard explanation → deterministic chain over approved guidance</td></tr>
+            <tr><td>Rollover question <strong>with no specific customer</strong></td><td><span class="pill no">A_augmented_llm</span></td><td>A general explanation → augmented LLM over RAG + Agent Skills (no customer data)</td></tr>
+            <tr><td>Rollover question <strong>+ a specific customer</strong> (id or name)</td><td><span class="pill" style="background:var(--pathb-soft);color:#264a78">B_prompt_chain</span></td><td>Needs live account data → controlled prompt chain over RAG + MCP + guardrail checkpoints</td></tr>
             <tr><td>Not a rollover request</td><td><span class="pill neutral">other</span></td><td>Falls into the clarification flow</td></tr>
           </tbody>
         </table>
@@ -533,18 +567,18 @@
         <span class="step shared">route</span>
       </div>
 
-      <div class="mini-h">Path A — Augmented LLM</div>
+      <div class="mini-h">Path A — Augmented LLM (RAG + Agent Skills, no MCP)</div>
       <div class="rail">
-        <span class="step a">decide_required_tools</span><span class="arr">→</span>
-        <span class="step a">call_mcp_tools</span><span class="arr">→</span>
-        <span class="step a">synthesize_rollover_plan</span>
+        <span class="step a">pa_gate <em>(validation + clarification_detector)</em></span><span class="arr">→</span>
+        <span class="step a">pa_explain <em>(rollover_response_style)</em></span><span class="arr">→</span>
+        <span class="step a">pa_build_checklist <em>(+ customer_language_policy)</em></span>
       </div>
 
-      <div class="mini-h">Path B — Controlled Prompt Chain</div>
+      <div class="mini-h">Path B — Controlled Prompt Chain (RAG + MCP customer data)</div>
       <div class="rail">
-        <span class="step b">pb_gate <em>(validation)</em></span><span class="arr">→</span>
-        <span class="step b">pb_explain <em>(step 1)</em></span><span class="arr">→</span>
-        <span class="step b">pb_build_checklist <em>(step 2)</em></span>
+        <span class="step b">decide_required_tools</span><span class="arr">→</span>
+        <span class="step b">call_mcp_tools</span><span class="arr">→</span>
+        <span class="step b">synthesize_rollover_plan</span>
       </div>
 
       <div class="mini-h">Shared tail</div>
@@ -554,7 +588,7 @@
         <span class="step shared">END</span>
       </div>
 
-      <p style="margin-top:18px">Three places can short-circuit straight to <code>format</code> with a clarification: no customer identifier (<code>decide_required_tools</code>), customer not found (<code>call_mcp_tools</code>), or no grounding available (<code>pb_gate</code>). Every node appends to a <code>trace</code> the UI can show.</p>
+      <p style="margin-top:18px">Three places can short-circuit straight to <code>format</code> with a clarification: no customer identifier (<code>decide_required_tools</code>, Path B), customer not found (<code>call_mcp_tools</code>, Path B), or no grounding / too-sparse question (<code>pa_gate</code>, Path A). Every node appends to a <code>trace</code> the UI can show.</p>
     </section>
 
     <section id="flows">
@@ -567,18 +601,18 @@
         <div class="flow-head">
           <span class="fno" style="color:var(--accent)">1</span>
           <h3>Clean rollover — customer in good standing</h3>
-          <span class="badge a">PATH A · no escalation</span>
+          <span class="badge b">PATH B · no escalation</span>
         </div>
         <div class="flow-body">
           <p class="prompt">"Customer Robert Miller is a 65-year-old army veteran. He wants to roll over an old 401(k) into a Fidelity IRA. Check what is needed, whether he already has an IRA, restrictions, forms, and draft a compliant response." &nbsp;<code>customer_id: CUST-1001</code></p>
           <div class="mini-h">Path taken</div>
           <div class="rail">
             <span class="step shared">parse</span><span class="arr">→</span>
-            <span class="step shared">classify → A</span><span class="arr">→</span>
+            <span class="step shared">classify → B</span><span class="arr">→</span>
             <span class="step shared">retrieve_rag</span><span class="arr">→</span>
-            <span class="step a">decide_tools</span><span class="arr">→</span>
-            <span class="step a">call_mcp_tools ×6</span><span class="arr">→</span>
-            <span class="step a">synthesize</span><span class="arr">→</span>
+            <span class="step b">decide_tools</span><span class="arr">→</span>
+            <span class="step b">call_mcp_tools ×6</span><span class="arr">→</span>
+            <span class="step b">synthesize</span><span class="arr">→</span>
             <span class="step shared">guardrails</span><span class="arr">→</span>
             <span class="step shared">format</span>
           </div>
@@ -586,10 +620,10 @@
           <p style="font-size:15px">No existing Fidelity IRA · source 401(k) at Example Benefits Plan Services · <strong>rollover allowed</strong> · no plan loan · <strong>no restrictions</strong> · identity verified · IRA application &amp; rollover form still missing.</p>
           <div class="mini-h">Response (key fields)</div>
           <dl class="kv">
-            <dt>path</dt><dd><span class="pill no">A_augmented_llm</span></dd>
+            <dt>path</dt><dd><span class="pill" style="background:var(--pathb-soft);color:#264a78">B_prompt_chain</span></dd>
             <dt>escalation</dt><dd><span class="pill no">false</span></dd>
             <dt>tools_called</dt><dd>6 (profile, ira, accounts, plan, restrictions, docs)</dd>
-            <dt>rag_sources</dt><dd><code>IRA-OPEN-02</code>, <code>ROLLOVER-SOP-01</code>, <code>APPROVED-LANG-03</code>, <code>FORMS-03</code></dd>
+            <dt>rag_sources</dt><dd><code>IRA-OPEN-02</code>, <code>ROLLOVER-SOP-01</code>, <code>FORMS-03</code>, <code>ESCALATION-01</code></dd>
           </dl>
           <div class="mini-h">answer</div>
           <p style="font-size:15px">"…the associate can first confirm that Robert Miller does not currently have a Fidelity IRA. The next step is to guide the customer through opening an IRA before initiating the rollover request from the old Example Benefits Plan Services 401(k). The source plan shows rollover eligibility as allowed and no restrictions or outstanding plan loan, so the case can proceed with standard next steps…"</p>
@@ -623,25 +657,25 @@
         <div class="flow-head">
           <span class="fno" style="color:var(--crit)">2</span>
           <h3>Higher-risk account — must escalate</h3>
-          <span class="badge crit">PATH A · escalation</span>
+          <span class="badge crit">PATH B · escalation</span>
         </div>
         <div class="flow-body">
-          <p class="prompt">"Customer wants to roll over a 401(k) into a Fidelity IRA. Check restrictions and draft a response." &nbsp;<code>customer_id: CUST-2002</code></p>
+          <p class="prompt">"Customer wants to roll over a 401(k) into a Fidelity IRA. Check restrictions and draft a response." &nbsp;<code>customer_id: CUST-2002</code> (Patricia)</p>
           <div class="mini-h">Path taken</div>
           <div class="rail">
             <span class="step shared">parse</span><span class="arr">→</span>
-            <span class="step shared">classify → A</span><span class="arr">→</span>
+            <span class="step shared">classify → B</span><span class="arr">→</span>
             <span class="step shared">retrieve_rag</span><span class="arr">→</span>
-            <span class="step a">call_mcp_tools ×6</span><span class="arr">→</span>
-            <span class="step a">synthesize</span><span class="arr">→</span>
-            <span class="step crit">guardrails → escalate</span><span class="arr">→</span>
+            <span class="step b">call_mcp_tools ×6</span><span class="arr">→</span>
+            <span class="step b">synthesize</span><span class="arr">→</span>
+            <span class="step crit">guardrails → escalate → human review</span><span class="arr">→</span>
             <span class="step shared">format</span>
           </div>
           <div class="mini-h">Why it escalates</div>
-          <p style="font-size:15px">The same six tools run, but the data trips the escalation rules: beneficiary dispute, address mismatch, an outstanding plan loan, unknown rollover eligibility, and incomplete identity verification.</p>
+          <p style="font-size:15px">The same six tools run, but Patricia's data trips the escalation rules: beneficiary dispute, address mismatch, an outstanding plan loan, unknown rollover eligibility, and incomplete identity verification — so Path B surfaces the human-in-the-loop review controls.</p>
           <div class="mini-h">Response (key fields)</div>
           <dl class="kv">
-            <dt>path</dt><dd><span class="pill no">A_augmented_llm</span></dd>
+            <dt>path</dt><dd><span class="pill" style="background:var(--pathb-soft);color:#264a78">B_prompt_chain</span></dd>
             <dt>escalation</dt><dd><span class="pill yes">true</span> · 8 reasons</dd>
             <dt>next_steps</dt><dd>Pause processing → escalate to a specialist (not clean proceed-as-normal steps)</dd>
           </dl>
@@ -665,28 +699,28 @@
       <!-- FLOW 3 -->
       <div class="flow">
         <div class="flow-head">
-          <span class="fno" style="color:var(--pathb)">3</span>
+          <span class="fno" style="color:var(--accent)">3</span>
           <h3>General explanation — no specific customer</h3>
-          <span class="badge b">PATH B · prompt chain</span>
+          <span class="badge a">PATH A · augmented LLM</span>
         </div>
         <div class="flow-body">
           <p class="prompt">"Explain how a 401(k) to IRA rollover works and what forms are needed." &nbsp;<code>(no customer_id)</code></p>
           <div class="mini-h">Path taken</div>
           <div class="rail">
             <span class="step shared">parse</span><span class="arr">→</span>
-            <span class="step shared">classify → B</span><span class="arr">→</span>
+            <span class="step shared">classify → A</span><span class="arr">→</span>
             <span class="step shared">retrieve_rag</span><span class="arr">→</span>
-            <span class="step b">pb_gate · topic=required_forms</span><span class="arr">→</span>
-            <span class="step b">pb_explain</span><span class="arr">→</span>
-            <span class="step b">pb_build_checklist</span><span class="arr">→</span>
+            <span class="step a">pa_gate · topic=required_forms</span><span class="arr">→</span>
+            <span class="step a">pa_explain</span><span class="arr">→</span>
+            <span class="step a">pa_build_checklist</span><span class="arr">→</span>
             <span class="step shared">guardrails</span><span class="arr">→</span>
             <span class="step shared">format</span>
           </div>
-          <div class="mini-h">How the chain works</div>
-          <p style="font-size:15px"><strong>pb_gate</strong> confirms there's grounding (fail-fast if not) and picks a sub-topic. <strong>pb_explain</strong> drafts a cited plain-language explanation. <strong>pb_build_checklist</strong> consumes that explanation and produces the standard steps + forms. Each step has a deterministic fallback, so it runs with no API key.</p>
+          <div class="mini-h">How the augmented LLM works</div>
+          <p style="font-size:15px"><strong>pa_gate</strong> confirms there's grounding (fail-fast if not), runs the <code>clarification_detector</code> skill, and picks a sub-topic. <strong>pa_explain</strong> runs the <code>rollover_response_style</code> skill for a cited plain-language explanation. <strong>pa_build_checklist</strong> produces the standard steps + forms, then the <code>customer_language_policy</code> skill shapes the customer draft. Auto-runs to a reviewable draft; each step has a deterministic fallback, so it runs with no API key.</p>
           <div class="mini-h">Response (key fields)</div>
           <dl class="kv">
-            <dt>path</dt><dd><span class="pill" style="background:var(--pathb-soft);color:#264a78">B_prompt_chain</span></dd>
+            <dt>path</dt><dd><span class="pill no">A_augmented_llm</span></dd>
             <dt>tools_called</dt><dd><span class="pill neutral">[ ] — no MCP, by design</span></dd>
             <dt>escalation</dt><dd><span class="pill no">false</span> (no customer data to assess)</dd>
             <dt>rag_sources</dt><dd><code>ROLLOVER-SOP-01</code>, <code>FORMS-06</code>, <code>FORMS-01</code>, <code>IRA-OPEN-02</code></dd>
@@ -695,7 +729,7 @@
           <p style="font-size:15px">"A standard 401(k)-to-IRA rollover typically requires the source plan's rollover/distribution paperwork, a Fidelity IRA application if no suitable IRA exists yet, and a Fidelity rollover request form. Identity verification must be complete before servicing proceeds. (Grounded in approved guidance: [ROLLOVER-SOP-01, FORMS-06, …].)"</p>
           <div class="note" style="border-left-color:var(--pathb)">
             <span class="lbl" style="color:#264a78">The teaching point</span>
-            Same front door, different engine. Customer-specific → Path A (live data + reasoning). Standard explanation → Path B (predictable, cheaper, <em>no</em> system access). One router, one contract, two engines.
+            Same front door, different engine. General question → Path A (augmented LLM: RAG + Agent Skills, predictable, cheaper, <em>no</em> system access). Customer-specific → Path B (controlled prompt chain: live MCP data + guardrail checkpoints). One router, one contract, two engines.
           </div>
         </div>
       </div>
@@ -712,10 +746,10 @@
           <div class="mini-h">Path taken</div>
           <div class="rail">
             <span class="step shared">parse</span><span class="arr">→</span>
-            <span class="step shared">classify → A</span><span class="arr">→</span>
+            <span class="step shared">classify → B</span><span class="arr">→</span>
             <span class="step shared">retrieve_rag</span><span class="arr">→</span>
-            <span class="step a">decide_tools</span><span class="arr">→</span>
-            <span class="step a">call_mcp_tools</span><span class="arr">→</span>
+            <span class="step b">decide_tools</span><span class="arr">→</span>
+            <span class="step b">call_mcp_tools</span><span class="arr">→</span>
             <span class="step clar">not found</span><span class="arr">→</span>
             <span class="step shared">format</span>
           </div>
@@ -725,7 +759,7 @@
             <dt>answer</dt><dd>"I couldn't locate a customer record for 'CUST-9999'. Please confirm the customer identifier (e.g. CUST-1001) or full name."</dd>
             <dt>escalation</dt><dd><span class="pill no">false</span></dd>
           </dl>
-          <p style="font-size:15px">The same short-circuit fires when no identifier is given at all, or — on Path B — when no approved guidance can be retrieved to ground an answer. The copilot never fabricates a customer or an answer it can't support.</p>
+          <p style="font-size:15px">The same short-circuit fires when no identifier is given at all, or — on Path A — when no approved guidance can be retrieved to ground an answer. The copilot never fabricates a customer or an answer it can't support.</p>
         </div>
       </div>
     </section>
@@ -830,7 +864,7 @@ pip install -r backend/requirements.txt -r mcp_server/requirements.txt
 <span class="c"># 3 · env + seed + ingest</span>
 cp .env.example .env          <span class="c"># optional: set OPENAI_API_KEY for live LLM</span>
 python scripts/seed_mock_data.py
-python scripts/ingest_docs.py  <span class="c"># 6 docs → 32 chunks</span>
+python scripts/ingest_docs.py  <span class="c"># 5 docs → 27 chunks (customer language is now an Agent Skill)</span>
 
 <span class="c"># 4 · MCP tool server (terminal A)</span>
 python mcp_server/server.py    <span class="c"># streamable-HTTP on :8100</span>

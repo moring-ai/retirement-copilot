@@ -1,21 +1,13 @@
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Toaster } from '@/components/ui/toaster'
-import { resolveRole } from '@/lib/role'
-import { RolePicker } from '@/components/role/RolePicker'
 import { AssociateApp } from '@/components/associate/AssociateApp'
-import { CustomerApp } from '@/components/customer/CustomerApp'
 
+// Associate-only app. The customer-facing experience has been removed; this
+// build serves the internal Fidelity associate exclusively.
 export default function App() {
-  const role = resolveRole()
   return (
     <TooltipProvider delayDuration={200}>
-      {role === 'associate' ? (
-        <AssociateApp />
-      ) : role === 'customer' ? (
-        <CustomerApp />
-      ) : (
-        <RolePicker />
-      )}
+      <AssociateApp />
       <Toaster />
     </TooltipProvider>
   )

@@ -1,4 +1,11 @@
-"""LangGraph node functions for the retirement copilot (Path A: Augmented LLM).
+"""LangGraph node functions: shared nodes + Path B (Controlled Prompt Chain).
+
+Shared: parse, classify (ROUTER), retrieve_rag, guardrails_check, format.
+Path B — Controlled Prompt Chain: decide_required_tools -> call_mcp_tools ->
+synthesize_rollover_plan. This is the *customer-specific* path — it calls the
+fixed batch of read-only MCP tools to ground the draft in live customer data,
+then runs the shared guardrail checkpoints (which can escalate to human review).
+Path A — Augmented LLM (RAG + Agent Skills, no MCP) lives in ``graph/path_a.py``.
 
 Each node is a small, mostly-deterministic step; the model only fills in content
 at the synthesis node. Every node appends a record to ``state['trace']`` so the
@@ -15,8 +22,8 @@ from app.mcp_client import client as mcp_client
 from app.rag import retriever
 from app.skills import run_skill
 
-# Read tools called for a customer-specific rollover case (the write tool is
-# intentionally excluded from the automatic path).
+# Read tools called for a customer-specific rollover case on Path B (the write
+# tool is intentionally excluded from the automatic path).
 READ_TOOLS = [
     "get_customer_profile",
     "check_existing_ira",
@@ -61,18 +68,20 @@ def parse_user_request(state: "dict") -> dict:
 # --- 2. classify (ROUTER) ---------------------------------------------------
 def classify_request(state: "dict") -> dict:
     # Front-door router (deterministic): choose the path before any model call.
-    #   rollover + customer-specific  -> Path A (Augmented LLM: live MCP + reasoning)
-    #   rollover + NOT customer-spec.  -> Path B (Controlled Prompt Chain: standard
-    #                                      explanation/checklist, no customer data)
-    #   not a rollover request         -> "other" (existing clarification flow)
+    #   rollover + general (no customer)  -> Path A (Augmented LLM: RAG + Agent
+    #                                        Skills only; no MCP; auto-run)
+    #   rollover + customer-specific       -> Path B (Controlled Prompt Chain: RAG +
+    #                                        fixed MCP customer tools + guardrail
+    #                                        checkpoints; human review on escalation)
+    #   not a rollover request             -> "other" (clarification flow)
     parsed = state.get("parsed", {})
     is_rollover = bool(parsed.get("rollover_keywords"))
     is_customer_specific = bool(parsed.get("customer_id") or parsed.get("customer_name"))
 
     if is_rollover and is_customer_specific:
-        path = "A_augmented_llm"
-    elif is_rollover and not is_customer_specific:
         path = "B_prompt_chain"
+    elif is_rollover and not is_customer_specific:
+        path = "A_augmented_llm"
     else:
         path = "other"
 
