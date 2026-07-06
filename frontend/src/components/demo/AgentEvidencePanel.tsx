@@ -52,6 +52,7 @@ function StepRow({ step, accent, active }: { step: ReasoningStep; accent: string
   const Icon = KIND_ICON[step.kind]
   const v = verdictStyle(step.verdict)
   const isGate = step.kind === 'gate'
+  const isSkill = step.kind === 'skill'
   const isEscalate = step.kind === 'escalate'
   const isDone = step.kind === 'done'
   return (
@@ -85,6 +86,14 @@ function StepRow({ step, accent, active }: { step: ReasoningStep; accent: string
                 style={{ background: accent }}
               >
                 Gate
+              </span>
+            )}
+            {isSkill && (
+              <span
+                className="mr-1.5 inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[8.5px] font-bold uppercase tracking-wider"
+                style={{ background: accent + '1a', color: accent, border: `1px solid ${accent}40` }}
+              >
+                <Puzzle className="h-2.5 w-2.5" /> Skill
               </span>
             )}
             <span
