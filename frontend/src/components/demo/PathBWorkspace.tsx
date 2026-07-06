@@ -7,9 +7,9 @@ import {
   PenLine,
   BadgeCheck,
   Check,
+  X,
   Lock,
   Loader2,
-  Send,
   ShieldAlert,
   UserCog,
   UserCheck,
@@ -101,16 +101,17 @@ function Card({ title, children, tone }: { title?: string; children: React.React
 // ── derivations ───────────────────────────────────────────────────────────────
 function nextActionText(
   s: DemoScenario,
-  d: { phase: string; submitted: boolean; hitl: string | null; allDone: boolean },
+  d: { phase: string; decision: string | null; hitl: string | null; allDone: boolean },
 ): string {
   if (s.nextAction) return s.nextAction
   const escalate = s.readiness === 'escalate'
-  if (d.submitted) return 'Case submitted for review — no further action needed.'
+  if (d.decision === 'approved') return 'Approved — returning to your queue.'
+  if (d.decision === 'rejected') return 'Rejected — returning to your queue.'
   if (d.hitl) return d.hitl === 'escalated' ? 'Escalated to a supervisor — awaiting their review.' : 'Reassigned to a specialist — handed off.'
   if (d.phase === 'running') return 'Review the evidence on the right as the agent completes its checks.'
   if (escalate) return 'Decide routing: escalate to a supervisor or reassign to a specialist.'
-  if (!d.allDone) return 'Complete the review queue below, then submit the draft for review.'
-  return 'Everything checks out — submit the reviewed draft for approval.'
+  if (!d.allDone) return 'Complete the review queue, then approve or reject the draft.'
+  return 'Review complete — approve or reject the customer response.'
 }
 
 // ── step: Case Context ─────────────────────────────────────────────────────────
@@ -302,7 +303,7 @@ function DraftCompliance({ scenario }: { scenario: DemoScenario }) {
 
 // ── step: Associate Approval ────────────────────────────────────────────────────
 function Approval({ scenario }: { scenario: DemoScenario }) {
-  const { checklist, toggleChecklist, submitted, hitl, submit, decideHitl, phase } = useDemo()
+  const { checklist, toggleChecklist, decision, hitl, approve, reject, decideHitl, phase } = useDemo()
   const items = scenario.reviewChecklist ?? []
   const allDone = items.every((i) => checklist[i.id])
   const remaining = items.filter((i) => !checklist[i.id]).length
@@ -361,9 +362,15 @@ function Approval({ scenario }: { scenario: DemoScenario }) {
       </div>
 
       <div className="mt-5">
-        {submitted ? (
-          <div className="flex items-center gap-2 rounded-xl border border-brand/30 bg-brand-soft/50 px-4 py-3 text-sm font-medium text-brand-dark animate-fade-in">
-            <CircleCheck className="h-4 w-4" /> Submitted for review.
+        {decision ? (
+          <div
+            className={cn(
+              'flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium animate-fade-in',
+              decision === 'approved' ? 'border-brand/30 bg-brand-soft/50 text-brand-dark' : 'border-danger/30 bg-danger-soft/50 text-danger',
+            )}
+          >
+            {decision === 'approved' ? <CircleCheck className="h-4 w-4" /> : <X className="h-4 w-4" />}
+            {decision === 'approved' ? 'Approved — returning to your queue…' : 'Rejected — returning to your queue…'}
           </div>
         ) : hitl ? (
           <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm font-medium text-ink animate-fade-in">
@@ -373,7 +380,7 @@ function Approval({ scenario }: { scenario: DemoScenario }) {
         ) : escalate ? (
           <div>
             <p className="mb-2 text-[13px] text-muted-foreground">
-              This case can’t be submitted while readiness checks are unresolved. The associate decides how to route it.
+              This case can’t be approved while readiness checks are unresolved. The associate decides how to route it.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button variant="destructive" onClick={() => decideHitl('escalated')}>
@@ -386,12 +393,23 @@ function Approval({ scenario }: { scenario: DemoScenario }) {
           </div>
         ) : (
           <div>
-            <Button size="lg" disabled={!allDone} onClick={submit}>
-              <Send /> Submit for Review
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button size="lg" disabled={!allDone} onClick={approve}>
+                <Check /> Approve
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                disabled={!allDone}
+                onClick={reject}
+                className="border-danger/40 text-danger hover:bg-danger-soft/40"
+              >
+                <X /> Reject
+              </Button>
+            </div>
             {!allDone && (
               <p className="mt-2 text-[12px] text-muted-foreground">
-                Confirm the {remaining} remaining review item{remaining === 1 ? '' : 's'} above to enable submission.
+                Confirm the {remaining} remaining review item{remaining === 1 ? '' : 's'} above to approve or reject.
               </p>
             )}
           </div>
@@ -424,7 +442,7 @@ function CaseSummaryCard({ scenario, statusText }: { scenario: DemoScenario; sta
   const readiness = d.readinessReady ? (scenario.readiness ?? 'ready') : 'analyzing…'
   const forms = d.formsReady ? `${(scenario.requiredForms ?? []).length} identified` : 'pending'
   const draft = d.draftReady ? (escalate ? 'withheld' : 'ready') : 'pending'
-  const approval = d.submitted ? 'submitted' : d.hitl ? d.hitl : d.approvalReady ? 'awaiting associate' : 'pending'
+  const approval = d.decision ? d.decision : d.hitl ? d.hitl : d.approvalReady ? 'awaiting associate' : 'pending'
   return (
     <Card title="Case Summary">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -432,7 +450,7 @@ function CaseSummaryCard({ scenario, statusText }: { scenario: DemoScenario; sta
         <StatusPill label="Readiness" value={readiness} tone={!d.readinessReady ? 'muted' : escalate ? 'danger' : 'good'} />
         <StatusPill label="Forms" value={forms} tone={d.formsReady ? 'neutral' : 'muted'} />
         <StatusPill label="Draft" value={draft} tone={!d.draftReady ? 'muted' : escalate ? 'warn' : 'good'} />
-        <StatusPill label="Approval" value={approval} tone={d.submitted ? 'good' : d.hitl ? 'warn' : 'muted'} />
+        <StatusPill label="Approval" value={approval} tone={d.decision === 'approved' ? 'good' : d.decision === 'rejected' ? 'danger' : d.hitl ? 'warn' : 'muted'} />
         <StatusPill label="Priority" value={scenario.caseCard.priority} tone={scenario.caseCard.priority === 'high' ? 'danger' : 'neutral'} />
       </div>
     </Card>
@@ -443,7 +461,7 @@ function NextBestActionCard({ scenario }: { scenario: DemoScenario }) {
   const d = useDemo()
   const items = scenario.reviewChecklist ?? []
   const allDone = items.every((i) => d.checklist[i.id])
-  const text = nextActionText(scenario, { phase: d.phase, submitted: d.submitted, hitl: d.hitl, allDone })
+  const text = nextActionText(scenario, { phase: d.phase, decision: d.decision, hitl: d.hitl, allDone })
   return (
     <div className="flex items-start gap-3 rounded-xl border p-4" style={{ borderColor: PATH_B + '33', background: PATH_B + '0d' }}>
       <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ background: PATH_B + '1a', color: PATH_B }}>
@@ -498,11 +516,12 @@ function DecisionSummaryCard({ scenario }: { scenario: DemoScenario }) {
 
 // ── the workspace ─────────────────────────────────────────────────────────────
 export function PathBWorkspace({ scenario }: { scenario: DemoScenario }) {
-  const { stepStatus, activeStep, setActiveStep, checklist, submitted, phase, close, skip, replay, submit, saveCase, requestReview, caseSaved, reviewRequested } = useDemo()
+  const { stepStatus, activeStep, setActiveStep, checklist, decision, phase, close, skip, replay, approve, saveCase, requestReview, caseSaved, reviewRequested } = useDemo()
   const escalate = scenario.readiness === 'escalate'
   const items = scenario.reviewChecklist ?? []
   const allDone = items.every((i) => checklist[i.id])
-  const statusText = submitted ? 'Submitted' : phase === 'running' ? 'Agent working…' : escalate ? 'Needs review' : 'Ready for approval'
+  const statusText =
+    decision === 'approved' ? 'Approved' : decision === 'rejected' ? 'Rejected' : phase === 'running' ? 'Agent working…' : escalate ? 'Needs review' : 'Ready for approval'
 
   const exportSummary = () => {
     const lines = [
@@ -522,7 +541,7 @@ export function PathBWorkspace({ scenario }: { scenario: DemoScenario }) {
   const onSave = () => { saveCase(); toast({ title: 'Case saved', variant: 'success' }) }
   const onRequestReview = () => { requestReview(); toast({ title: 'Sent to associate review queue', variant: 'info' }) }
 
-  const canApprove = phase === 'result' && allDone && !escalate && !submitted
+  const canApprove = phase === 'result' && allDone && !escalate && !decision
 
   return (
     <div className="flex h-full flex-col">
@@ -595,17 +614,18 @@ export function PathBWorkspace({ scenario }: { scenario: DemoScenario }) {
               <Button size="sm" variant="outline" onClick={exportSummary}>
                 <Download className="h-3.5 w-3.5" /> Export Summary
               </Button>
-              <Button size="sm" variant="secondary" onClick={onRequestReview} disabled={reviewRequested || submitted}>
+              <Button size="sm" variant="secondary" onClick={onRequestReview} disabled={reviewRequested || !!decision}>
                 <UserCheck className="h-3.5 w-3.5" /> {reviewRequested ? 'Review requested' : 'Request Associate Review'}
               </Button>
               <div className="ml-auto">
                 <Button
                   size="sm"
                   disabled={!canApprove}
-                  onClick={submit}
+                  onClick={approve}
                   title={escalate ? 'Resolve the escalation before approving' : !allDone ? 'Complete the review queue first' : undefined}
                 >
-                  <BadgeCheck className="h-3.5 w-3.5" /> {submitted ? 'Case finished' : 'Approve / Finish Case'}
+                  <BadgeCheck className="h-3.5 w-3.5" />
+                  {decision === 'approved' ? 'Approved' : decision === 'rejected' ? 'Rejected' : 'Approve / Finish Case'}
                 </Button>
               </div>
             </div>

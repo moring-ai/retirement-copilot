@@ -9,14 +9,16 @@ import { PathBWorkspace } from './PathBWorkspace'
 // workflow (Path B) — and reflects the outcome back into the queue AFTER the
 // agent has done the work (never precomputed).
 export function RunWorkspace() {
-  const { scenario, phase, submitted, hitl } = useDemo()
+  const { scenario, phase, decision, hitl, close } = useDemo()
   const { dispatch } = useWorkspace()
 
   useEffect(() => {
     if (!scenario) return
     const id = scenario.caseCard.id
-    if (submitted) {
+    if (decision === 'approved') {
       dispatch({ type: 'SET_CASE_STAGE', caseId: id, stage: 'submitted', progressPct: 100, currentStep: 'review' })
+    } else if (decision === 'rejected') {
+      dispatch({ type: 'SET_CASE_STAGE', caseId: id, stage: 'rejected', progressPct: 66, currentStep: 'review' })
     } else if (hitl) {
       dispatch({ type: 'SET_CASE_STAGE', caseId: id, stage: 'escalated', progressPct: 66, currentStep: 'goal_eligibility' })
     } else if (phase === 'result') {
@@ -29,7 +31,14 @@ export function RunWorkspace() {
         dispatch({ type: 'SET_CASE_STAGE', caseId: id, stage: 'in_review', progressPct: 83, currentStep: 'response' })
       }
     }
-  }, [scenario, phase, submitted, hitl, dispatch])
+  }, [scenario, phase, decision, hitl, dispatch])
+
+  // After an Approve/Reject decision, return to the home queue after a beat.
+  useEffect(() => {
+    if (!decision) return
+    const t = setTimeout(() => close(), 1000)
+    return () => clearTimeout(t)
+  }, [decision, close])
 
   if (!scenario) return null
 

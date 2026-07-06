@@ -21,6 +21,7 @@ export type StepStatus = 'pending' | 'running' | 'complete' | 'needs_info'
 export const B_STEPS: BStep[] = ['context', 'readiness', 'forms', 'draft', 'approval']
 
 export type HitlDecision = 'escalated' | 'reassigned' | null
+export type Decision = 'approved' | 'rejected' | null
 
 interface DemoState {
   scenario: DemoScenario | null
@@ -40,7 +41,7 @@ interface DemoState {
   approvalReady: boolean
   // interaction / action-button demo state
   checklist: Record<string, boolean>
-  submitted: boolean
+  decision: Decision
   hitl: HitlDecision
   caseSaved: boolean
   reviewRequested: boolean
@@ -52,7 +53,8 @@ interface DemoState {
   togglePanel: () => void
   setActiveStep: (s: BStep) => void
   toggleChecklist: (id: string) => void
-  submit: () => void
+  approve: () => void
+  reject: () => void
   decideHitl: (d: Exclude<HitlDecision, null>) => void
   saveCase: () => void
   requestReview: () => void
@@ -93,7 +95,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   const [complianceReady, setComplianceReady] = useState(false)
   const [approvalReady, setApprovalReady] = useState(false)
   const [checklist, setChecklist] = useState<Record<string, boolean>>({})
-  const [submitted, setSubmitted] = useState(false)
+  const [decision, setDecision] = useState<Decision>(null)
   const [hitl, setHitl] = useState<HitlDecision>(null)
   const [caseSaved, setCaseSaved] = useState(false)
   const [reviewRequested, setReviewRequested] = useState(false)
@@ -129,7 +131,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     setComplianceReady(false)
     setApprovalReady(false)
     setChecklist({})
-    setSubmitted(false)
+    setDecision(null)
     setHitl(null)
     setCaseSaved(false)
     setReviewRequested(false)
@@ -276,7 +278,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       complianceReady,
       approvalReady,
       checklist,
-      submitted,
+      decision,
       hitl,
       caseSaved,
       reviewRequested,
@@ -287,12 +289,13 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       togglePanel: () => setPanelOpen((o) => !o),
       setActiveStep: (s) => setActiveStep(s),
       toggleChecklist: (id) => setChecklist((c) => ({ ...c, [id]: !c[id] })),
-      submit: () => setSubmitted(true),
+      approve: () => setDecision('approved'),
+      reject: () => setDecision('rejected'),
       decideHitl: (d) => setHitl(d),
       saveCase: () => setCaseSaved(true),
       requestReview: () => setReviewRequested(true),
     }),
-    [scenario, panelOpen, phase, answerLen, stepStatus, activeStep, evidenceRevealed, readinessRevealed, readinessReady, formsReady, draftReady, complianceReady, approvalReady, checklist, submitted, hitl, caseSaved, reviewRequested, start, close, replay, skip],
+    [scenario, panelOpen, phase, answerLen, stepStatus, activeStep, evidenceRevealed, readinessRevealed, readinessReady, formsReady, draftReady, complianceReady, approvalReady, checklist, decision, hitl, caseSaved, reviewRequested, start, close, replay, skip],
   )
 
   return <DemoCtx.Provider value={value}>{children}</DemoCtx.Provider>
