@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import {
   Plus,
   Search,
-  ShieldCheck,
   ChevronDown,
   SlidersHorizontal,
 } from 'lucide-react'
@@ -253,10 +252,6 @@ export function CaseHome() {
           </>
         )}
 
-        <div className="mt-8 flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
-          <ShieldCheck className="h-3.5 w-3.5" />
-          Associate-facing · human-in-the-loop · every action reviewed before it’s sent
-        </div>
       </div>
 
       <NewCaseDialog open={newCaseOpen} onOpenChange={setNewCaseOpen} />

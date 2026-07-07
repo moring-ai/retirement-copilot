@@ -156,9 +156,7 @@ function Body({ scenario }: { scenario: DemoScenario }) {
           {isB ? 'Controlled Prompt Chain' : 'Augmented LLM'}
         </p>
         <p className="mt-0.5 text-[11px] leading-snug text-ink-soft">
-          {isB
-            ? 'Gated, step-by-step: each checkpoint tests live customer data and can pass, branch, or flag → human review.'
-            : 'One grounded pass over RAG + Agent Skills. No customer data, no gates, no human step.'}
+          {isB ? 'RAG + MCP customer data · gated checkpoints' : 'RAG + Agent Skills · no customer data'}
         </p>
       </div>
 

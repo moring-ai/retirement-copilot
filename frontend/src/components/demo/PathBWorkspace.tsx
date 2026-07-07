@@ -108,7 +108,7 @@ function nextActionText(
   if (d.decision === 'approved') return 'Approved — returning to your queue.'
   if (d.decision === 'rejected') return 'Rejected — returning to your queue.'
   if (d.hitl) return d.hitl === 'escalated' ? 'Escalated to a supervisor — awaiting their review.' : 'Reassigned to a specialist — handed off.'
-  if (d.phase === 'running') return 'Review the evidence on the right as the agent completes its checks.'
+  if (d.phase === 'running') return 'The agent is completing its checks.'
   if (escalate) return 'Decide routing: escalate to a supervisor or reassign to a specialist.'
   if (!d.allDone) return 'Complete the review queue, then approve or reject the draft.'
   return 'Review complete — approve or reject the customer response.'
@@ -310,7 +310,7 @@ function Approval({ scenario }: { scenario: DemoScenario }) {
   const escalate = scenario.readiness === 'escalate'
   return (
     <div>
-      <SectionTitle hint="Final human-in-the-loop review before anything is submitted.">Associate Approval</SectionTitle>
+      <SectionTitle hint="Final review before submitting.">Associate Approval</SectionTitle>
       <div className="grid gap-2.5 sm:grid-cols-3">
         <Field label="Readiness" value={escalate ? 'Escalate' : 'Ready to proceed'} />
         <Field label="Required forms" value={`${(scenario.requiredForms ?? []).length} identified`} />

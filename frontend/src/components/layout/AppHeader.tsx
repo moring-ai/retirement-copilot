@@ -45,11 +45,11 @@ export function AppHeader() {
               </span>
             )}
           </h1>
-          <p className="hidden truncate text-xs text-muted-foreground sm:block">
-            {inWorkspace
-              ? `${activeCase?.id ?? 'New case'} · ${customer.customer_id}`
-              : 'Agent-assisted rollover servicing for internal associates'}
-          </p>
+          {inWorkspace && (
+            <p className="hidden truncate text-xs text-muted-foreground sm:block">
+              {`${activeCase?.id ?? 'New case'} · ${customer.customer_id}`}
+            </p>
+          )}
         </div>
 
         <div className="ml-auto flex items-center gap-2 lg:gap-3">
