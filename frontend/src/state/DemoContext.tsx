@@ -8,6 +8,8 @@ import {
   useState,
 } from 'react'
 import { getScenario, type DemoScenario } from '@/data/demo-scenarios'
+import { buildLiveScenario } from '@/data/live-scenario'
+import { postChat } from '@/lib/chatContract'
 
 // A self-contained state machine for the case-run experience, kept isolated from
 // the case-workspace reducer. It drives two very different UIs:
@@ -102,6 +104,8 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
 
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
   const interval = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Guards against a slow /chat resolving into a run the associate already left.
+  const runToken = useRef(0)
 
   const clearAll = useCallback(() => {
     timers.current.forEach(clearTimeout)
@@ -137,80 +141,114 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     setReviewRequested(false)
   }
 
+  // Path A — reasoning events + answer text stream in together.
+  const playPathA = useCallback((s: DemoScenario) => {
+    s.reasoning.forEach((_, i) => at(700 * (i + 1), () => setEvidenceRevealed(i + 1)))
+    const full = s.answer ?? ''
+    const CHUNK = Math.max(5, Math.round(full.length / 70))
+    interval.current = setInterval(() => {
+      setAnswerLen((n) => {
+        const next = n + CHUNK
+        if (next >= full.length) {
+          if (interval.current) clearInterval(interval.current)
+          interval.current = null
+          setPhase('result')
+          return full.length
+        }
+        return next
+      })
+    }, 70)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Path B — one gated event per beat; steps go running → complete gradually.
+  const playPathB = useCallback((s: DemoScenario) => {
+    const escalate = s.readiness === 'escalate'
+    const nChecks = (s.readinessChecks ?? []).length
+    const clampChecks = (k: number) => setReadinessRevealed(Math.min(k, nChecks))
+
+    at(BEAT_MS * 1, () => setEvidenceRevealed(2)) // customer-specific gate
+    at(BEAT_MS * 2, () => { setEvidenceRevealed(3); clampChecks(1) }) // profile → customer found
+    at(BEAT_MS * 3, () => setEvidenceRevealed(4)) // customer-found gate
+    at(BEAT_MS * 4, () => { setEvidenceRevealed(5); clampChecks(2) }) // IRA / accounts
+    at(BEAT_MS * 5, () => { setEvidenceRevealed(6); clampChecks(4) }) // source plan (rollover-allowed + loan)
+    at(BEAT_MS * 6, () => { setEvidenceRevealed(7); clampChecks(5) }) // restrictions
+    at(BEAT_MS * 7, () => { setEvidenceRevealed(8); clampChecks(nChecks) }) // identity → all checks in
+    at(BEAT_MS * 8, () => {
+      setEvidenceRevealed(9) // validate / readiness result
+      setStepStatus((st) => ({ ...st, readiness: escalate ? 'needs_info' : 'complete', forms: 'running' }))
+      setActiveStep('forms')
+      setReadinessReady(true)
+    })
+    at(BEAT_MS * 9, () => {
+      setEvidenceRevealed(10) // guardrails gate
+      setStepStatus((st) => ({ ...st, forms: 'complete', draft: 'running' }))
+      setActiveStep('draft')
+      setFormsReady(true)
+    })
+    at(BEAT_MS * 10, () => {
+      setEvidenceRevealed(11) // done / escalate
+      setStepStatus((st) => ({
+        ...st,
+        draft: escalate ? 'needs_info' : 'complete',
+        approval: 'pending',
+      }))
+      setActiveStep('approval')
+      setDraftReady(true)
+      setComplianceReady(true)
+      setApprovalReady(true)
+      setChecklist(autoChecklist(s, escalate))
+      setPhase('result')
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const start = useCallback(
     (id: string) => {
-      const s = getScenario(id)
-      if (!s) return
+      const base = getScenario(id)
+      if (!base) return
       clearAll()
-      setScenario(s)
+      const token = ++runToken.current
+      setScenario(base)
       setPanelOpen(true)
       resetProgress()
 
-      if (s.path === 'A_augmented_llm') {
-        // Reasoning events stream in slowly; the answer text streams alongside.
-        s.reasoning.forEach((_, i) => at(700 * (i + 1), () => setEvidenceRevealed(i + 1)))
-        const full = s.answer ?? ''
-        const CHUNK = Math.max(5, Math.round(full.length / 70))
-        interval.current = setInterval(() => {
-          setAnswerLen((n) => {
-            const next = n + CHUNK
-            if (next >= full.length) {
-              if (interval.current) clearInterval(interval.current)
-              interval.current = null
-              setPhase('result')
-              return full.length
-            }
-            return next
+      // Fire the REAL backend /chat (which performs real MCP tool calls), then
+      // play the run over the live response. Falls back to the scripted scenario
+      // if the backend is unreachable, so the demo still works fully offline.
+      if (base.path === 'A_augmented_llm') {
+        setEvidenceRevealed(1) // never-blank: show the router step immediately
+        postChat({ message: base.question })
+          .then((resp) => {
+            if (runToken.current !== token) return
+            const live = buildLiveScenario(base, resp)
+            setScenario(live)
+            playPathA(live)
           })
-        }, 70)
+          .catch(() => {
+            if (runToken.current !== token) return
+            playPathA(base)
+          })
         return
       }
 
-      // Path B — one event per beat; steps go running → complete gradually.
-      const escalate = s.readiness === 'escalate'
-      const nChecks = (s.readinessChecks ?? []).length
-      const clampChecks = (k: number) => setReadinessRevealed(Math.min(k, nChecks))
-
-      // Beat 0 (synchronous — the workspace is never blank).
+      // Path B — never-blank beat 0 while the real tool chain runs.
       setStepStatus({ ...ALL_PENDING, context: 'complete', readiness: 'running' })
       setActiveStep('readiness')
       setEvidenceRevealed(1)
-
-      at(BEAT_MS * 1, () => setEvidenceRevealed(2)) // customer-specific gate
-      at(BEAT_MS * 2, () => { setEvidenceRevealed(3); clampChecks(1) }) // profile → customer found
-      at(BEAT_MS * 3, () => setEvidenceRevealed(4)) // customer-found gate
-      at(BEAT_MS * 4, () => { setEvidenceRevealed(5); clampChecks(2) }) // IRA / accounts
-      at(BEAT_MS * 5, () => { setEvidenceRevealed(6); clampChecks(4) }) // source plan (rollover-allowed + loan)
-      at(BEAT_MS * 6, () => { setEvidenceRevealed(7); clampChecks(5) }) // restrictions
-      at(BEAT_MS * 7, () => { setEvidenceRevealed(8); clampChecks(nChecks) }) // identity → all checks in
-      at(BEAT_MS * 8, () => {
-        setEvidenceRevealed(9) // validate / readiness result
-        setStepStatus((st) => ({ ...st, readiness: escalate ? 'needs_info' : 'complete', forms: 'running' }))
-        setActiveStep('forms')
-        setReadinessReady(true)
-      })
-      at(BEAT_MS * 9, () => {
-        setEvidenceRevealed(10) // guardrails gate
-        setStepStatus((st) => ({ ...st, forms: 'complete', draft: 'running' }))
-        setActiveStep('draft')
-        setFormsReady(true)
-      })
-      at(BEAT_MS * 10, () => {
-        setEvidenceRevealed(11) // done / escalate
-        setStepStatus((st) => ({
-          ...st,
-          draft: escalate ? 'needs_info' : 'complete',
-          approval: 'pending',
-        }))
-        setActiveStep('approval')
-        setDraftReady(true)
-        setComplianceReady(true)
-        setApprovalReady(true)
-        setChecklist(autoChecklist(s, escalate))
-        setPhase('result')
-      })
+      postChat({ message: base.question, customer_id: base.customerId })
+        .then((resp) => {
+          if (runToken.current !== token) return
+          const live = buildLiveScenario(base, resp)
+          setScenario(live)
+          playPathB(live)
+        })
+        .catch(() => {
+          if (runToken.current !== token) return
+          playPathB(base)
+        })
     },
-    [clearAll],
+    [clearAll, playPathA, playPathB],
   )
 
   // Jump straight to the settled end-state (Skip control).
