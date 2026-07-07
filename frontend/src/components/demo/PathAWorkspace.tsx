@@ -11,11 +11,6 @@ import {
   MessageSquarePlus,
   SkipForward,
   RotateCcw,
-  ListChecks,
-  Search,
-  GitCompare,
-  FileText,
-  ArrowRight,
 } from 'lucide-react'
 import type { DemoScenario } from '@/data/demo-scenarios'
 import { useDemo } from '@/state/DemoContext'
@@ -145,30 +140,6 @@ export function PathAWorkspace({ scenario }: { scenario: DemoScenario }) {
 
               {/* RIGHT rail — filled from t0 (skeletons while the agent works) */}
               <div className="space-y-4">
-                {/* quick summary */}
-                <div className="rounded-xl border border-border bg-card p-4">
-                  <div className="mb-2 flex items-center gap-1.5">
-                    <ListChecks className="h-3.5 w-3.5 text-secondary" />
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">Quick summary</span>
-                  </div>
-                  {done && scenario.quickSummary ? (
-                    <ul className="space-y-1.5 animate-fade-in">
-                      {scenario.quickSummary.map((b) => (
-                        <li key={b} className="flex gap-2 text-[12.5px] leading-snug text-ink">
-                          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: PATH_A }} />
-                          {b}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="space-y-2" aria-hidden>
-                      <div className="h-2.5 w-full animate-pulse rounded bg-muted" />
-                      <div className="h-2.5 w-5/6 animate-pulse rounded bg-muted" />
-                      <div className="h-2.5 w-11/12 animate-pulse rounded bg-muted" />
-                    </div>
-                  )}
-                </div>
-
                 {/* evidence: sources + skills (progressive) */}
                 <div className="space-y-3 rounded-xl border border-border bg-card p-4">
                   <div>
@@ -202,16 +173,6 @@ export function PathAWorkspace({ scenario }: { scenario: DemoScenario }) {
                     )}
                   </div>
                 </div>
-
-                {/* related actions (always available) */}
-                <div className="rounded-xl border border-border bg-card p-4">
-                  <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-ink-soft">Related actions</p>
-                  <div className="space-y-2">
-                    <RelatedAction icon={Search} label="Check a specific customer rollover" onClick={() => start('b-robert')} />
-                    <RelatedAction icon={FileText} label="Find required forms" onClick={() => toast({ title: 'Forms guidance', description: 'IRA application, plan paperwork, rollover request form.', variant: 'info' })} />
-                    <RelatedAction icon={GitCompare} label="Compare direct vs indirect" onClick={replay} />
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -220,21 +181,5 @@ export function PathAWorkspace({ scenario }: { scenario: DemoScenario }) {
         <AgentEvidencePanel />
       </div>
     </div>
-  )
-}
-
-function RelatedAction({ icon: Icon, label, onClick }: { icon: typeof Search; label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex items-center justify-between gap-2 rounded-lg border border-border bg-background/60 px-3 py-2 text-left text-[12.5px] font-medium text-ink-soft transition-colors hover:bg-muted"
-    >
-      <span className="flex items-center gap-2">
-        <Icon className="h-3.5 w-3.5" style={{ color: PATH_A }} />
-        {label}
-      </span>
-      <ArrowRight className="h-3.5 w-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" style={{ color: PATH_A }} />
-    </button>
   )
 }
