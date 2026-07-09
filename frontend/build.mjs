@@ -91,7 +91,10 @@ function buildCss({ watch } = {}) {
   const args = ['-i', 'src/index.css', '-o', 'dist/app.css']
   if (!serve) args.push('--minify')
   if (watch) args.push('--watch')
-  const child = spawn(bin, args, { cwd: root, stdio: 'inherit' })
+  // shell: true so this also works on Windows — spawn() can't directly exec an
+  // extensionless POSIX shim like node_modules\.bin\tailwindcss without a shell
+  // (throws ENOENT / errno -4058 even though the file exists).
+  const child = spawn(bin, args, { cwd: root, stdio: 'inherit', shell: true })
   return child
 }
 
