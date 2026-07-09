@@ -1,0 +1,37 @@
+# PGVector ONLY. Backend (FastAPI) and the MCP server run as plain Python
+# processes, not Docker containers — see RUN_COMMANDS.txt. Docker is used
+# solely for Postgres/PGVector, matching the pattern in
+# retirement-copilot-nodemo/docker-compose.pgvector.yml.
+#
+# Run:   docker compose -f docker-compose.pgvector.yml up -d
+# Stop:  docker compose -f docker-compose.pgvector.yml down   (add -v to drop the volume)
+services:
+  postgres:
+    image: fcr-nonprod.fmr.com/pgvector/pgvector:pg16
+    container_name: retirement-copilot-pgvector
+    environment:
+      POSTGRES_USER: copilot
+      POSTGRES_PASSWORD: copilot   # Required for init; trust method allows connections without a password
+      POSTGRES_INITDB_ARGS: "-c password_encryption=scram-sha-256"
+      POSTGRES_HOST_AUTH_METHOD: trust   # Allow local connections without a password
+      POSTGRES_DB: retirement_copilot
+      # Corporate proxy so the image can be pulled / initialised on the network.
+      http_proxy: http://http.proxy.fmr.com:8000
+      https_proxy: http://http.proxy.fmr.com:8000
+      HTTP_PROXY: http://http.proxy.fmr.com:8000
+      HTTPS_PROXY: http://http.proxy.fmr.com:8000
+      NO_PROXY: fmr.com,fmrcloud.com,localhost,127.0.0.1,10.0.0.0/8,10.96.0.0/12,192.168.99.0/24
+      no_proxy: fmr.com,fmrcloud.com,localhost,127.0.0.1,10.0.0.0/8,10.96.0.0/12,192.168.99.0/24
+    ports:
+      - "5433:5432"   # host 5433 to avoid clashing with a local Postgres on 5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U copilot -d retirement_copilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

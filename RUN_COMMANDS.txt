@@ -1,0 +1,51 @@
+Retirement Copilot — local run commands
+========================================
+Docker is used ONLY for PGVector (docker-compose.pgvector.yml). The backend and
+the MCP server run as plain Python processes — no Docker containers for them.
+
+Run these from the repo root: retirement-copilot-demo/
+
+1) Start PGVector (Docker)
+--------------------------
+docker compose -f docker-compose.pgvector.yml up -d
+
+Stop it later with:
+docker compose -f docker-compose.pgvector.yml down
+# add -v to also delete the pgvector volume:
+docker compose -f docker-compose.pgvector.yml down -v
+
+2) Python environment + dependencies
+-------------------------------------
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt -r mcp_server/requirements.txt
+
+3) Configure env + seed mock data
+----------------------------------
+cp .env.example .env
+python scripts/seed_mock_data.py
+
+4) Ingest the approved RAG docs into PGVector
+----------------------------------------------
+python scripts/ingest_docs.py
+
+5) Start the MCP tool server  (run in its own terminal — Terminal A)
+----------------------------------------------------------------------
+python mcp_server/server.py
+# serves streamable-HTTP at http://localhost:8100/mcp
+
+6) Start the FastAPI backend  (run in its own terminal — Terminal B)
+----------------------------------------------------------------------
+uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8080
+
+7) Verify
+---------
+curl -s http://localhost:8080/health
+bash scripts/smoke_test.sh
+
+8) Frontend (optional, separate terminal — Terminal C)
+--------------------------------------------------------
+cd frontend
+npm install
+npm run dev
+# serves on http://localhost:5173
