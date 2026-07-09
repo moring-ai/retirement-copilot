@@ -8,6 +8,8 @@ import {
   useState,
 } from 'react'
 import { getScenario, type DemoScenario } from '@/data/demo-scenarios'
+import { runScenario } from '@/lib/backendRun'
+import { toast } from '@/components/ui/use-toast'
 
 // A self-contained state machine for the case-run experience, kept isolated from
 // the case-workspace reducer. It drives two very different UIs:
@@ -27,6 +29,8 @@ interface DemoState {
   scenario: DemoScenario | null
   panelOpen: boolean
   phase: 'running' | 'result'
+  /** Whether the current run came from the live backend or a fallback sample. */
+  dataSource: 'live' | 'offline'
   // Path A
   answerLen: number
   // Path B — progressive reveal (pure functions of which beat fired)
@@ -84,6 +88,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   const [scenario, setScenario] = useState<DemoScenario | null>(null)
   const [panelOpen, setPanelOpen] = useState(true)
   const [phase, setPhase] = useState<'running' | 'result'>('running')
+  const [dataSource, setDataSource] = useState<'live' | 'offline'>('live')
   const [answerLen, setAnswerLen] = useState(0)
   const [stepStatus, setStepStatus] = useState<Record<BStep, StepStatus>>(ALL_PENDING)
   const [activeStep, setActiveStep] = useState<BStep>('context')
@@ -120,6 +125,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
 
   const resetProgress = () => {
     setPhase('running')
+    setDataSource('live')
     setAnswerLen(0)
     setStepStatus(ALL_PENDING)
     setActiveStep('context')
@@ -137,79 +143,107 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     setReviewRequested(false)
   }
 
+  // Progressive reveal of an already-resolved run. `scn` carries LIVE data mapped
+  // from the backend (or the scripted sample on fallback). Customer context is
+  // shown first; the chain then advances one beat at a time for readability.
+  const reveal = (scn: DemoScenario) => {
+    setScenario(scn)
+
+    if (scn.path === 'A_augmented_llm') {
+      scn.reasoning.forEach((_, i) => at(650 * (i + 1), () => setEvidenceRevealed(i + 1)))
+      const full = scn.answer ?? ''
+      const CHUNK = Math.max(5, Math.round(full.length / 70))
+      interval.current = setInterval(() => {
+        setAnswerLen((n) => {
+          const next = n + CHUNK
+          if (next >= full.length) {
+            if (interval.current) clearInterval(interval.current)
+            interval.current = null
+            setPhase('result')
+            return full.length
+          }
+          return next
+        })
+      }, 70)
+      return
+    }
+
+    // Path B — Case Context is already shown (customer info first). Hold a beat on
+    // it, then advance readiness → forms → draft → approval.
+    const escalate = scn.readiness === 'escalate'
+    const nChecks = (scn.readinessChecks ?? []).length
+    const clampChecks = (k: number) => setReadinessRevealed(Math.min(k, nChecks))
+
+    setEvidenceRevealed(1) // router · classify (context stays active this beat)
+    at(BEAT_MS * 1, () => {
+      setEvidenceRevealed(2) // customer-specific gate
+      setStepStatus((st) => ({ ...st, context: 'complete', readiness: 'running' }))
+      setActiveStep('readiness')
+    })
+    at(BEAT_MS * 2, () => { setEvidenceRevealed(3); clampChecks(1) }) // profile → found
+    at(BEAT_MS * 3, () => setEvidenceRevealed(4)) // customer-found gate
+    at(BEAT_MS * 4, () => { setEvidenceRevealed(5); clampChecks(2) }) // IRA / accounts
+    at(BEAT_MS * 5, () => { setEvidenceRevealed(6); clampChecks(4) }) // source plan
+    at(BEAT_MS * 6, () => { setEvidenceRevealed(7); clampChecks(5) }) // restrictions
+    at(BEAT_MS * 7, () => { setEvidenceRevealed(8); clampChecks(nChecks) }) // identity
+    at(BEAT_MS * 8, () => {
+      setEvidenceRevealed(9) // validate / readiness result
+      setStepStatus((st) => ({ ...st, readiness: escalate ? 'needs_info' : 'complete', forms: 'running' }))
+      setActiveStep('forms')
+      setReadinessReady(true)
+    })
+    at(BEAT_MS * 9, () => {
+      setEvidenceRevealed(10) // guardrails gate
+      setStepStatus((st) => ({ ...st, forms: 'complete', draft: 'running' }))
+      setActiveStep('draft')
+      setFormsReady(true)
+    })
+    at(BEAT_MS * 10, () => {
+      setEvidenceRevealed(11) // done / escalate
+      setStepStatus((st) => ({ ...st, draft: escalate ? 'needs_info' : 'complete', approval: 'pending' }))
+      setActiveStep('approval')
+      setDraftReady(true)
+      setComplianceReady(true)
+      setApprovalReady(true)
+      setChecklist(autoChecklist(scn, escalate))
+      setPhase('result')
+    })
+  }
+
   const start = useCallback(
     (id: string) => {
-      const s = getScenario(id)
-      if (!s) return
+      const base = getScenario(id)
+      if (!base) return
       clearAll()
-      setScenario(s)
+      setScenario(base)
       setPanelOpen(true)
       resetProgress()
 
-      if (s.path === 'A_augmented_llm') {
-        // Reasoning events stream in slowly; the answer text streams alongside.
-        s.reasoning.forEach((_, i) => at(700 * (i + 1), () => setEvidenceRevealed(i + 1)))
-        const full = s.answer ?? ''
-        const CHUNK = Math.max(5, Math.round(full.length / 70))
-        interval.current = setInterval(() => {
-          setAnswerLen((n) => {
-            const next = n + CHUNK
-            if (next >= full.length) {
-              if (interval.current) clearInterval(interval.current)
-              interval.current = null
-              setPhase('result')
-              return full.length
-            }
-            return next
-          })
-        }, 70)
-        return
+      // Show the case immediately — customer context first, never blank while the
+      // backend works the request.
+      if (base.path === 'B_prompt_chain') {
+        setStepStatus({ ...ALL_PENDING, context: 'complete' })
+        setActiveStep('context')
       }
 
-      // Path B — one event per beat; steps go running → complete gradually.
-      const escalate = s.readiness === 'escalate'
-      const nChecks = (s.readinessChecks ?? []).length
-      const clampChecks = (k: number) => setReadinessRevealed(Math.min(k, nChecks))
-
-      // Beat 0 (synchronous — the workspace is never blank).
-      setStepStatus({ ...ALL_PENDING, context: 'complete', readiness: 'running' })
-      setActiveStep('readiness')
-      setEvidenceRevealed(1)
-
-      at(BEAT_MS * 1, () => setEvidenceRevealed(2)) // customer-specific gate
-      at(BEAT_MS * 2, () => { setEvidenceRevealed(3); clampChecks(1) }) // profile → customer found
-      at(BEAT_MS * 3, () => setEvidenceRevealed(4)) // customer-found gate
-      at(BEAT_MS * 4, () => { setEvidenceRevealed(5); clampChecks(2) }) // IRA / accounts
-      at(BEAT_MS * 5, () => { setEvidenceRevealed(6); clampChecks(4) }) // source plan (rollover-allowed + loan)
-      at(BEAT_MS * 6, () => { setEvidenceRevealed(7); clampChecks(5) }) // restrictions
-      at(BEAT_MS * 7, () => { setEvidenceRevealed(8); clampChecks(nChecks) }) // identity → all checks in
-      at(BEAT_MS * 8, () => {
-        setEvidenceRevealed(9) // validate / readiness result
-        setStepStatus((st) => ({ ...st, readiness: escalate ? 'needs_info' : 'complete', forms: 'running' }))
-        setActiveStep('forms')
-        setReadinessReady(true)
-      })
-      at(BEAT_MS * 9, () => {
-        setEvidenceRevealed(10) // guardrails gate
-        setStepStatus((st) => ({ ...st, forms: 'complete', draft: 'running' }))
-        setActiveStep('draft')
-        setFormsReady(true)
-      })
-      at(BEAT_MS * 10, () => {
-        setEvidenceRevealed(11) // done / escalate
-        setStepStatus((st) => ({
-          ...st,
-          draft: escalate ? 'needs_info' : 'complete',
-          approval: 'pending',
-        }))
-        setActiveStep('approval')
-        setDraftReady(true)
-        setComplianceReady(true)
-        setApprovalReady(true)
-        setChecklist(autoChecklist(s, escalate))
-        setPhase('result')
-      })
+      // Call the REAL backend (/chat). On success, reveal the live-mapped run; on
+      // failure, fall back to the scripted sample so the UI never blanks.
+      runScenario(base)
+        .then((merged) => {
+          setDataSource('live')
+          reveal(merged)
+        })
+        .catch(() => {
+          setDataSource('offline')
+          toast({
+            title: 'Live backend unreachable',
+            description: 'Showing sample data for this case.',
+            variant: 'info',
+          })
+          reveal(base)
+        })
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [clearAll],
   )
 
@@ -267,6 +301,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       scenario,
       panelOpen,
       phase,
+      dataSource,
       answerLen,
       stepStatus,
       activeStep,
@@ -295,7 +330,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       saveCase: () => setCaseSaved(true),
       requestReview: () => setReviewRequested(true),
     }),
-    [scenario, panelOpen, phase, answerLen, stepStatus, activeStep, evidenceRevealed, readinessRevealed, readinessReady, formsReady, draftReady, complianceReady, approvalReady, checklist, decision, hitl, caseSaved, reviewRequested, start, close, replay, skip],
+    [scenario, panelOpen, phase, dataSource, answerLen, stepStatus, activeStep, evidenceRevealed, readinessRevealed, readinessReady, formsReady, draftReady, complianceReady, approvalReady, checklist, decision, hitl, caseSaved, reviewRequested, start, close, replay, skip],
   )
 
   return <DemoCtx.Provider value={value}>{children}</DemoCtx.Provider>

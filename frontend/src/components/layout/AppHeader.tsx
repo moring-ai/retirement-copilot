@@ -13,6 +13,8 @@ export function AppHeader() {
   const { state, dispatch } = useWorkspace()
   const inWorkspace = state.view === 'workspace'
   const customer = CUSTOMERS[state.activeCustomerId]
+  const customerName = customer?.name ?? 'Customer'
+  const customerIdLabel = customer?.customer_id ?? state.activeCustomerId ?? '—'
   const activeCase = state.cases.find((c) => c.id === state.activeCaseId)
 
   return (
@@ -35,7 +37,7 @@ export function AppHeader() {
         <div className="min-w-0 leading-tight">
           <h1 className="truncate text-base font-semibold text-ink lg:text-lg">
             {inWorkspace ? (
-              customer.name
+              customerName
             ) : (
               <span>
                 <span className="font-serif italic font-semibold text-brand">
@@ -47,7 +49,7 @@ export function AppHeader() {
           </h1>
           <p className="hidden truncate text-xs text-muted-foreground sm:block">
             {inWorkspace
-              ? `${activeCase?.id ?? 'New case'} · ${customer.customer_id}`
+              ? `${activeCase?.id ?? 'New case'} · ${customerIdLabel}`
               : 'Agent-assisted rollover servicing for internal associates'}
           </p>
         </div>
@@ -74,7 +76,7 @@ export function AppHeader() {
                     toast({
                       variant: 'info',
                       title: 'Case saved',
-                      description: `${activeCase?.id ?? customer.customer_id} saved to your queue.`,
+                      description: `${activeCase?.id ?? customerIdLabel} saved to your queue.`,
                     })
                   }
                 >

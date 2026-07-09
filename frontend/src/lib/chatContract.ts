@@ -84,17 +84,25 @@ export const BACKEND_URL: string =
   (import.meta as { env?: Record<string, string> }).env?.VITE_BACKEND_URL ??
   'http://127.0.0.1:8080'
 
-/** POST /chat — runs the real deterministic router + Path A/B on the backend. */
-export async function postChat(req: ChatRequest): Promise<ChatResponse> {
-  const res = await fetch(`${BACKEND_URL}/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) {
-    throw new Error(`/chat failed: ${res.status} ${res.statusText}`)
+/** POST /chat — runs the real deterministic router + Path A/B on the backend.
+ *  Aborts after `timeoutMs` so the UI never hangs on an unresponsive backend. */
+export async function postChat(req: ChatRequest, timeoutMs = 30000): Promise<ChatResponse> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(`${BACKEND_URL}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      throw new Error(`/chat failed: ${res.status} ${res.statusText}`)
+    }
+    return (await res.json()) as ChatResponse
+  } finally {
+    clearTimeout(timer)
   }
-  return (await res.json()) as ChatResponse
 }
 
 export interface HealthResponse {

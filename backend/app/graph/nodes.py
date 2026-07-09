@@ -37,6 +37,35 @@ _CUST_ID_RE = re.compile(r"\bCUST-\d+\b", re.IGNORECASE)
 _NAME_RE = re.compile(r"\bcustomer\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})")
 _ROLLOVER_KW = ("rollover", "roll over", "roll-over", "401k", "401(k)", "ira")
 
+# Intent signals used by the router to tell a *general/educational* question apart
+# from a *customer-servicing directive* — even when a customer_id is attached to
+# the case. A general question ("what's the difference…", "how does…") should go
+# to Path A (Augmented LLM) and never trigger a customer MCP lookup.
+_GENERAL_MARKERS = (
+    "what is", "what's", "what are", "what does", "how do", "how does", "how can",
+    "how would", "why ", "explain", "difference between", "differences between",
+    "generally", "in general", "overview", "tell me about", "walk me through",
+    "can you explain", "vs ", "vs.", "versus", "compare", "what happens",
+    "general question", "how a ", "how the ",
+)
+# Directives that clearly ask the copilot to act on THIS customer's account.
+_DIRECTIVE_MARKERS = (
+    "check eligibility", "check restrictions", "check the restrictions",
+    "check what", "check whether", "check if", "draft a", "draft the",
+    "draft a compliant", "draft response", "draft a response", "for this customer",
+    "this customer", "their account", "his account", "her account",
+    "process the rollover", "initiate", "open a case", "eligibility, restrictions",
+    "restrictions, and forms", "check eligibility, restrictions",
+)
+
+
+def _detect_intent(msg: str) -> tuple[bool, bool]:
+    """Return (is_general, is_directive) from the message text."""
+    low = msg.lower()
+    is_general = any(m in low for m in _GENERAL_MARKERS)
+    is_directive = any(m in low for m in _DIRECTIVE_MARKERS)
+    return is_general, is_directive
+
 
 def _trace(state, step, status, detail):
     state.setdefault("trace", []).append({"step": step, "status": status, "detail": detail})
@@ -67,32 +96,52 @@ def parse_user_request(state: "dict") -> dict:
 
 # --- 2. classify (ROUTER) ---------------------------------------------------
 def classify_request(state: "dict") -> dict:
-    # Front-door router (deterministic): choose the path before any model call.
-    #   rollover + general (no customer)  -> Path A (Augmented LLM: RAG + Agent
-    #                                        Skills only; no MCP; auto-run)
-    #   rollover + customer-specific       -> Path B (Controlled Prompt Chain: RAG +
-    #                                        fixed MCP customer tools + guardrail
-    #                                        checkpoints; human review on escalation)
-    #   not a rollover request             -> "other" (clarification flow)
+    # Front-door router (deterministic, INTENT-AWARE): choose the path before any
+    # model call.
+    #   rollover + general/educational intent -> Path A (Augmented LLM: RAG + Agent
+    #        Skills only; no MCP), EVEN when a customer_id is attached to the case.
+    #        A general question ("what's the difference…") must not trigger a
+    #        customer lookup just because the case has a customer on it.
+    #   rollover + customer-specific servicing -> Path B (Controlled Prompt Chain:
+    #        RAG + fixed MCP customer tools + guardrail checkpoints; human review on
+    #        escalation).
+    #   not a rollover request -> "other" (clarification flow)
     parsed = state.get("parsed", {})
+    message = state.get("message", "")
     is_rollover = bool(parsed.get("rollover_keywords"))
-    is_customer_specific = bool(parsed.get("customer_id") or parsed.get("customer_name"))
+    has_customer = bool(parsed.get("customer_id") or parsed.get("customer_name"))
+    is_general, is_directive = _detect_intent(message)
 
-    if is_rollover and is_customer_specific:
-        path = "B_prompt_chain"
-    elif is_rollover and not is_customer_specific:
-        path = "A_augmented_llm"
-    else:
+    # A request is "customer-specific servicing" only when it's tied to a customer
+    # AND is not a purely general question. A general question wins even with a
+    # customer_id present (unless it also carries an explicit servicing directive).
+    is_customer_specific = has_customer and (is_directive or not is_general)
+
+    if not is_rollover:
         path = "other"
+    elif is_general and not is_directive:
+        # General/educational rollover question -> Augmented LLM, no MCP.
+        path = "A_augmented_llm"
+    elif is_customer_specific:
+        path = "B_prompt_chain"
+    else:
+        # Rollover, no customer and no directive -> general augmented answer.
+        path = "A_augmented_llm"
 
     classification = {
         "category": "retirement_rollover_servicing" if is_rollover else "other",
         "is_customer_specific": is_customer_specific,
+        "is_general_intent": is_general and not is_directive,
+        "has_customer": has_customer,
         "confidence": 0.95 if is_rollover else 0.4,
         "path": path,
     }
     state["classification"] = classification
-    _trace(state, "classify_request", "ok", str(classification))
+    detail = (
+        f"path={path} · rollover={is_rollover} · general_intent={is_general and not is_directive}"
+        f" · customer_specific={is_customer_specific} · has_customer={has_customer}"
+    )
+    _trace(state, "classify_request", "ok", detail)
     return state
 
 

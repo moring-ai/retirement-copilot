@@ -96,6 +96,45 @@ export const CUSTOMERS: Record<string, Customer> = {
       notes: 'Prior servicing note references an unresolved beneficiary dispute.',
     },
   },
+
+  // Marcus asks a general/educational question (Path A). Kept here so any
+  // customer lookup for his case is safe even though Path A uses no MCP data.
+  'CUST-3310': {
+    customer_id: 'CUST-3310',
+    name: 'Marcus Bell',
+    age: 47,
+    employment_status: 'Employed',
+    veteran_status: 'Not a veteran',
+    state: 'Texas',
+    contact_preference: 'email',
+    email: 'marcus.bell@example.com',
+    phone: '+1-512-555-0173',
+    date_of_birth: '1978-11-05',
+    ssn_last4: '2915',
+    risk_flags: [],
+    has_existing_fidelity_ira: false,
+    retirement_accounts: [],
+    source_plan: {
+      description: 'Former employer 401(k)',
+      plan_provider: 'Not yet identified',
+      plan_type: '401(k)',
+      balance_estimate: 0,
+      rollover_allowed: 'unknown',
+      outstanding_plan_loan: false,
+    },
+    destination_account: 'Fidelity Traditional IRA',
+    rollover_goal: 'Understand rollover options before deciding',
+    account_restrictions: [],
+    documents: {
+      ira_application: 'missing',
+      rollover_request_form: 'missing',
+      identity_verification: 'complete',
+    },
+    case_status: {
+      open_rollover_case: false,
+      notes: 'General inquiry — no servicing case opened yet.',
+    },
+  },
 }
 
 export const CUSTOMER_LIST = Object.values(CUSTOMERS)

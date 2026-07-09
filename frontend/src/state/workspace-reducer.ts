@@ -388,7 +388,7 @@ function touchCase(state: WorkspaceState): WorkspaceState {
       ? {
           ...c,
           customerId: state.activeCustomerId,
-          customerName: CUSTOMERS[state.activeCustomerId].name,
+          customerName: CUSTOMERS[state.activeCustomerId]?.name ?? c.customerName,
           goalLabel: goalLabel(state.selectedGoalId),
           currentStep: state.activeStep,
           progressPct: progressPct(state.stepStatuses),
@@ -464,7 +464,7 @@ export function workspaceReducer(
       const newCase: CaseSummary = {
         id,
         customerId,
-        customerName: CUSTOMERS[customerId].name,
+        customerName: CUSTOMERS[customerId]?.name ?? 'Customer',
         goalLabel: 'Not yet selected',
         stage: 'draft',
         priority: 'medium',
